@@ -127,12 +127,14 @@ const headlessTerm = new HeadlessTerminal({
 const serializeAddon = new SerializeAddon();
 headlessTerm.loadAddon(serializeAddon);
 
-function getCleanScreenLines() {
+function getCleanScreenLines(maxLines = 120) {
   const lines = [];
   const buffer = headlessTerm.buffer.active;
   const numRows = headlessTerm.rows;
-  for (let y = 0; y < numRows; y++) {
-    const line = buffer.getLine(buffer.baseY + y);
+  const total = buffer.baseY + numRows;
+  const start = Math.max(0, total - maxLines);
+  for (let y = start; y < total; y++) {
+    const line = buffer.getLine(y);
     if (line) {
       lines.push(line.translateToString(true));
     }
@@ -210,6 +212,28 @@ setInterval(() => {
   }
 }, 25);
 
+let screenBroadcastTimer = null;
+function broadcastCleanScreen() {
+  if (clients.size === 0) return;
+  const lines = getCleanScreenLines(120);
+  const payload = JSON.stringify({ type: 'screen', lines });
+  for (const client of clients) {
+    if (client.readyState === WebSocket.OPEN) {
+      client.send(payload, (err) => {
+        if (err) clients.delete(client);
+      });
+    }
+  }
+}
+
+function scheduleScreenBroadcast() {
+  if (screenBroadcastTimer) return;
+  screenBroadcastTimer = setTimeout(() => {
+    screenBroadcastTimer = null;
+    broadcastCleanScreen();
+  }, 20);
+}
+
 function spawnPty(cols = 80, rows = 30) {
   ensureTmuxSession();
 
@@ -258,6 +282,7 @@ function spawnPty(cols = 80, rows = 30) {
     } catch (e) {}
 
     appendScrollback(data);
+    scheduleScreenBroadcast();
 
     // Direct immediate broadcast (zero latency)
     if (clients.size > 0) {
@@ -277,6 +302,7 @@ function spawnPty(cols = 80, rows = 30) {
 
   ptyProcess.onExit(({ exitCode }) => {
     ensureTmuxSession();
+    scheduleScreenBroadcast();
     const payload = JSON.stringify({
       type: 'status',
       message: `\r\n\x1b[33m[Session reconnecting to ${TMUX_SESSION}...]\x1b[0m\r\n`,
@@ -743,6 +769,7 @@ wss.on('connection', (ws, req) => {
         tmux: TMUX_SESSION,
         shell: USER_SHELL,
       },
+      lines: getCleanScreenLines(120),
       history: initialHistory,
       telemetry: getLightTelemetry(),
     }),
@@ -832,9 +859,11 @@ wss.on('connection', (ws, req) => {
           scrollbackExceededCount = 0;
           try {
             headlessTerm.clear();
+            headlessTerm.reset();
           } catch (e) {}
           ws.send(JSON.stringify({ type: 'cleared' }));
           if (ptyProcess) ptyProcess.write('\x0c');
+          broadcastCleanScreen();
           break;
 
         case 'ping':

@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Modal,
+  Dimensions,
 } from 'react-native';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
@@ -123,6 +124,79 @@ function parseAnsi(rawText: string): StyledSegment[] {
   return segments;
 }
 
+function renderStyledLine(line: string): React.ReactNode {
+  if (!line || line.trim() === '') {
+    return <Text style={styles.textMuted}>{' '}</Text>;
+  }
+
+  // 1. Starship prompt line: "~ ❯ cmd" or "❯ cmd"
+  if (line.includes(' ❯ ') || line.startsWith('❯ ') || line.startsWith('~ ❯')) {
+    const parts = line.split(/(❯)/);
+    return (
+      <Text>
+        <Text style={styles.promptPath}>{parts[0]}</Text>
+        <Text style={styles.promptArrow}>❯</Text>
+        <Text style={styles.promptCmd}>{parts.slice(2).join('')}</Text>
+      </Text>
+    );
+  }
+
+  // 2. Failed exit code Starship prompt: "~ ✗ cmd"
+  if (line.includes(' ✗ ') || line.startsWith('✗ ') || line.startsWith('~ ✗')) {
+    const parts = line.split(/(✗)/);
+    return (
+      <Text>
+        <Text style={styles.promptPath}>{parts[0]}</Text>
+        <Text style={styles.promptFail}>✗</Text>
+        <Text style={styles.promptCmd}>{parts.slice(2).join('')}</Text>
+      </Text>
+    );
+  }
+
+  // 3. Antigravity prompt: ">" or "> "
+  if (line.startsWith('>') || line.startsWith(' > ')) {
+    return (
+      <Text>
+        <Text style={styles.promptArrow}>&gt; </Text>
+        <Text style={styles.textWhite}>{line.replace(/^>\s*/, '')}</Text>
+      </Text>
+    );
+  }
+
+  // 4. Antigravity logo characters (▄▀)
+  if (line.includes('▄▀') || line.includes('▀▀')) {
+    return <Text style={styles.logoText}>{line}</Text>;
+  }
+
+  // 5. Section dividers (───)
+  if (/^[─━\-_=]{3,}$/.test(line.trim())) {
+    return <Text style={styles.dividerLine}>{line}</Text>;
+  }
+
+  // 6. Errors or failures
+  if (/^(error|fatal|fail|exception):/i.test(line.trim()) || line.includes('error:')) {
+    return <Text style={styles.textRed}>{line}</Text>;
+  }
+
+  // 7. Warnings or notices
+  if (/^(warning|notice):/i.test(line.trim())) {
+    return <Text style={styles.textAmber}>{line}</Text>;
+  }
+
+  // 8. Success / Pass
+  if (/^(\[PASS\]|success)/i.test(line.trim())) {
+    return <Text style={styles.textGreen}>{line}</Text>;
+  }
+
+  // 9. Status bar (e.g. "? for shortcuts ... Gemini")
+  if (line.includes('? for shortcuts') || line.includes('Gemini')) {
+    return <Text style={styles.statusBarText}>{line}</Text>;
+  }
+
+  // 10. Default clean text
+  return <Text style={styles.textNormal}>{line}</Text>;
+}
+
 // ==========================================
 // 3. Main Industrial Minimalist Component
 // ==========================================
@@ -135,8 +209,10 @@ export default function App() {
   const [latency, setLatency] = useState<number | null>(null);
 
   // Terminal State
+  const [screenLines, setScreenLines] = useState<string[]>([]);
   const [terminalText, setTerminalText] = useState<string>('');
   const [inputCommand, setInputCommand] = useState('');
+  const [isInputFocused, setIsInputFocused] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -169,6 +245,7 @@ export default function App() {
 
   // Low-latency Refs
   const socketRef = useRef<WebSocket | null>(null);
+  const inputRef = useRef<TextInput | null>(null);
   const scrollViewRef = useRef<ScrollView | null>(null);
   const incomingBufferRef = useRef('');
   const flushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -224,6 +301,10 @@ export default function App() {
         setStatus('connected');
         triggerHaptic('light');
 
+        const { width } = Dimensions.get('window');
+        const calculatedCols = Math.max(45, Math.floor((width - 24) / 7.2));
+        ws.send(JSON.stringify({ type: 'resize', cols: calculatedCols, rows: 35 }));
+
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
         pingIntervalRef.current = setInterval(() => {
           if (ws.readyState === WebSocket.OPEN) {
@@ -236,11 +317,14 @@ export default function App() {
         if (!isMountedRef.current) return;
         try {
           const msg = JSON.parse(event.data);
-          if (msg.type === 'output') {
-            appendOutputChunk(msg.data);
+          if (msg.type === 'screen' && Array.isArray(msg.lines)) {
+            setScreenLines(msg.lines);
           } else if (msg.type === 'init') {
+            if (Array.isArray(msg.lines)) setScreenLines(msg.lines);
             if (msg.history) setTerminalText(msg.history);
             if (msg.telemetry) setTelemetry(msg.telemetry);
+          } else if (msg.type === 'output') {
+            appendOutputChunk(msg.data);
           } else if (msg.type === 'telemetry') {
             setTelemetry(msg.data);
           } else if (msg.type === 'status' && msg.message) {
@@ -248,6 +332,7 @@ export default function App() {
           } else if (msg.type === 'pong' && msg.clientTime) {
             setLatency(Date.now() - msg.clientTime);
           } else if (msg.type === 'cleared') {
+            setScreenLines([]);
             setTerminalText('');
           }
         } catch (e) {
@@ -296,7 +381,7 @@ export default function App() {
         socketRef.current.send(JSON.stringify({ type: 'signal', signal: 'enter' }));
       } else {
         socketRef.current.send(JSON.stringify({ type: 'input', data: cmd }));
-        setHistory((prev) => [cmd, ...prev.slice(0, 40)]);
+        setHistory((prev) => [cmd, ...prev.filter((h) => h !== cmd).slice(0, 40)]);
         setHistoryIndex(-1);
         setInputCommand('');
       }
@@ -321,6 +406,7 @@ export default function App() {
 
   const clearScreen = () => {
     triggerHaptic('light');
+    setScreenLines([]);
     setTerminalText('');
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({ type: 'clear' }));
@@ -344,6 +430,7 @@ export default function App() {
       setHistoryIndex(nextIdx);
       setInputCommand(nextIdx === -1 ? '' : history[nextIdx]);
     }
+    inputRef.current?.focus();
   };
 
   const parsedSegments = useMemo(() => {
@@ -405,37 +492,59 @@ export default function App() {
       {/* VIEW 1: TERMINAL                                     */}
       {/* ==================================================== */}
       {activeTab === 'terminal' && (
-        <View style={styles.flexOne}>
-          <ScrollView
-            ref={scrollViewRef}
-            style={styles.terminalViewport}
-            contentContainerStyle={styles.terminalContent}
-            onContentSizeChange={() => {
-              if (autoScroll) {
-                scrollViewRef.current?.scrollToEnd({ animated: false });
-              }
-            }}
-          >
-            <Text style={styles.terminalText} selectable>
-              {parsedSegments.map((seg, idx) => (
-                <Text
-                  key={idx}
-                  style={{
-                    color: seg.color || '#e4e4e7',
-                    fontWeight: seg.bold ? '700' : '400',
-                  }}
-                >
-                  {seg.text}
-                </Text>
-              ))}
-            </Text>
-          </ScrollView>
+        <KeyboardAvoidingView
+          style={styles.flexOne}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        >
+          <View style={styles.flexOne}>
+            <ScrollView
+              ref={scrollViewRef}
+              style={styles.terminalViewport}
+              contentContainerStyle={styles.terminalContent}
+              keyboardShouldPersistTaps="handled"
+              onContentSizeChange={() => {
+                if (autoScroll) {
+                  scrollViewRef.current?.scrollToEnd({ animated: false });
+                }
+              }}
+            >
+              <TouchableOpacity
+                activeOpacity={1}
+                onPress={() => inputRef.current?.focus()}
+                style={styles.touchableTerminal}
+              >
+                {screenLines.length === 0 && !terminalText ? (
+                  <View style={styles.emptyContainer}>
+                    <Text style={styles.emptyPrompt}>[omarchy-remote ready]</Text>
+                    <Text style={styles.emptySub}>Tap anywhere to start typing...</Text>
+                  </View>
+                ) : screenLines.length > 0 ? (
+                  screenLines.map((line, idx) => (
+                    <Text key={idx} style={styles.terminalLine} selectable>
+                      {renderStyledLine(line)}
+                    </Text>
+                  ))
+                ) : (
+                  parsedSegments.map((seg, idx) => (
+                    <Text
+                      key={idx}
+                      style={{
+                        color: seg.color || '#e4e4e7',
+                        fontWeight: seg.bold ? '700' : '400',
+                        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+                        fontSize: 12,
+                        lineHeight: 18,
+                      }}
+                    >
+                      {seg.text}
+                    </Text>
+                  ))
+                )}
+              </TouchableOpacity>
+            </ScrollView>
 
-          {/* Minimal Keycaps Ribbon */}
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
-          >
+            {/* Keycap Ribbon (pinned above keyboard) */}
             <View style={styles.keycapRibbon}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ribbonScroll}>
                 <TouchableOpacity style={[styles.keycap, styles.keycapCtrlC]} onPress={() => sendSignal('ctrl_c')}>
@@ -454,11 +563,11 @@ export default function App() {
                   <Text style={styles.keycapText}>TAB</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.keycap} onPress={() => sendSignal('arrow_up')}>
+                <TouchableOpacity style={styles.keycap} onPress={() => handleHistoryNav('up')}>
                   <Text style={styles.keycapText}>▲</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.keycap} onPress={() => sendSignal('arrow_down')}>
+                <TouchableOpacity style={styles.keycap} onPress={() => handleHistoryNav('down')}>
                   <Text style={styles.keycapText}>▼</Text>
                 </TouchableOpacity>
 
@@ -466,7 +575,13 @@ export default function App() {
                   <Text style={styles.keycapEnterText}>Enter ↵</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={[styles.keycap, styles.keycapTool]} onPress={() => sendCommand('agy')}>
+                <TouchableOpacity
+                  style={[styles.keycap, styles.keycapTool]}
+                  onPress={() => {
+                    setInputCommand('agy');
+                    inputRef.current?.focus();
+                  }}
+                >
                   <Text style={styles.keycapToolText}>agy</Text>
                 </TouchableOpacity>
 
@@ -481,34 +596,49 @@ export default function App() {
                     setAutoScroll((p) => !p);
                   }}
                 >
-                  <Text style={styles.keycapText}>{autoScroll ? 'AUTO-SCROLL' : 'FREE'}</Text>
+                  <Text style={styles.keycapText}>{autoScroll ? 'SCROLL: ON' : 'SCROLL: FREE'}</Text>
                 </TouchableOpacity>
               </ScrollView>
             </View>
 
-            {/* Industrial Minimal Input Bar */}
-            <View style={styles.inputBar}>
-              <Text style={styles.promptChar}>$</Text>
+            {/* High-Visibility Floating Input Bar */}
+            <View style={[styles.inputBar, isInputFocused && styles.inputBarFocused]}>
+              <Text style={[styles.promptChar, isInputFocused && styles.promptCharFocused]}>❯</Text>
               <TextInput
+                ref={inputRef}
                 style={styles.inputField}
                 value={inputCommand}
                 onChangeText={setInputCommand}
+                onFocus={() => {
+                  setIsInputFocused(true);
+                  if (autoScroll) {
+                    setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 150);
+                  }
+                }}
+                onBlur={() => setIsInputFocused(false)}
                 placeholder="Type command or prompt..."
                 placeholderTextColor="#52525b"
                 autoCapitalize="none"
                 autoCorrect={false}
+                spellCheck={false}
+                keyboardAppearance="dark"
                 returnKeyType="send"
                 onSubmitEditing={() => sendCommand()}
               />
+              {inputCommand.length > 0 && (
+                <TouchableOpacity style={styles.clearInputBtn} onPress={() => setInputCommand('')}>
+                  <Text style={styles.clearInputText}>✕</Text>
+                </TouchableOpacity>
+              )}
               <TouchableOpacity
                 style={[styles.sendBtn, status === 'connected' ? styles.sendBtnActive : styles.sendBtnDisabled]}
                 onPress={() => sendCommand()}
               >
-                <Text style={styles.sendBtnText}>SEND</Text>
+                <Text style={styles.sendBtnText}>{inputCommand.trim() ? 'SEND' : '↵'}</Text>
               </TouchableOpacity>
             </View>
-          </KeyboardAvoidingView>
-        </View>
+          </View>
+        </KeyboardAvoidingView>
       )}
 
       {/* ==================================================== */}
@@ -775,17 +905,90 @@ const styles = StyleSheet.create({
   terminalViewport: {
     flex: 1,
     backgroundColor: '#0a0b0d',
-    paddingHorizontal: 10,
+    paddingHorizontal: 8,
   },
   terminalContent: {
     paddingTop: 8,
     paddingBottom: 24,
+  },
+  touchableTerminal: {
+    flex: 1,
+    minHeight: '100%',
   },
   terminalText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 12,
     lineHeight: 18,
     color: '#e4e4e7',
+  },
+  terminalLine: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 12,
+    lineHeight: 19,
+    color: '#e4e4e7',
+    letterSpacing: 0.2,
+  },
+  promptPath: {
+    color: '#38bdf8',
+    fontWeight: '700',
+  },
+  promptArrow: {
+    color: '#22c55e',
+    fontWeight: '800',
+  },
+  promptFail: {
+    color: '#f87171',
+    fontWeight: '800',
+  },
+  promptCmd: {
+    color: '#f4f4f5',
+    fontWeight: '600',
+  },
+  textWhite: {
+    color: '#ffffff',
+  },
+  textNormal: {
+    color: '#e4e4e7',
+  },
+  textMuted: {
+    color: '#52525b',
+  },
+  textRed: {
+    color: '#f87171',
+  },
+  textAmber: {
+    color: '#fbbf24',
+  },
+  textGreen: {
+    color: '#4ade80',
+  },
+  logoText: {
+    color: '#818cf8',
+    fontWeight: '700',
+  },
+  dividerLine: {
+    color: '#3f3f46',
+  },
+  statusBarText: {
+    color: '#a1a1aa',
+    fontSize: 11,
+  },
+  emptyContainer: {
+    paddingVertical: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyPrompt: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 13,
+    color: '#71717a',
+    fontWeight: '700',
+  },
+  emptySub: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 11,
+    color: '#52525b',
+    marginTop: 6,
   },
 
   // Keycap Ribbon
@@ -862,7 +1065,7 @@ const styles = StyleSheet.create({
     borderColor: '#3b82f6',
   },
 
-  // Input Bar
+  // High-Visibility Floating Input Bar
   inputBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -873,28 +1076,45 @@ const styles = StyleSheet.create({
     borderTopColor: '#1e2028',
     gap: 8,
   },
+  inputBarFocused: {
+    backgroundColor: '#14161f',
+    borderTopColor: '#3b82f6',
+  },
   promptChar: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 14,
-    fontWeight: '700',
+    fontSize: 15,
+    fontWeight: '800',
     color: '#71717a',
+  },
+  promptCharFocused: {
+    color: '#22c55e',
   },
   inputField: {
     flex: 1,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 13,
-    color: '#f4f4f5',
+    fontSize: 14,
+    color: '#ffffff',
     backgroundColor: '#161820',
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    borderRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    borderRadius: 6,
     borderWidth: 1,
     borderColor: '#262936',
+  },
+  clearInputBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 4,
+  },
+  clearInputText: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 13,
+    color: '#71717a',
+    fontWeight: '700',
   },
   sendBtn: {
     paddingHorizontal: 14,
     paddingVertical: 9,
-    borderRadius: 4,
+    borderRadius: 6,
   },
   sendBtnActive: {
     backgroundColor: '#f4f4f5',
@@ -1091,5 +1311,4 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: '#0a0b0d',
   },
-  textRed: { color: '#ef4444' },
 });
