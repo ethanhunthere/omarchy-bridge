@@ -1,0 +1,3 @@
+# Tightly-scoped passwordless permissions for Omarchy Remote Control Center
+# Allows the background bridge daemon to power manage and set wake timers without password prompts
+f0id ALL=(ALL) NOPASSWD: /usr/bin/systemctl poweroff, /usr/bin/systemctl reboot, /usr/bin/systemctl suspend, /usr/bin/rtcwake, /usr/bin/powerprofilesctl, /usr/bin/ethtool, /usr/bin/iw

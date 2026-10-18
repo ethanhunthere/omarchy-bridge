@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "Omarchy Terminal",
+    "slug": "omarchy-cli-bridge",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.omarchy.clibridge"
+    },
+    "android": {
+      "package": "com.omarchy.clibridge"
+    }
+  }
+}
