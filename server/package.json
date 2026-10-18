@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "test": "node test-suite.js",
+    "test:stress": "node stress-test.js"
   },
   "dependencies": {
     "@xterm/addon-serialize": "^0.14.0",

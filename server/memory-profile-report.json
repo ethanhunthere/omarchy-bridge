@@ -1,0 +1,172 @@
+{
+  "testDate": "2026-10-18T20:52:41.179Z",
+  "durationSeconds": 60,
+  "maxScrollbackBytes": 524288,
+  "totalBytesStreamed": 11062344,
+  "totalMessagesReceived": 135342,
+  "baseline": {
+    "rss": 68165632,
+    "heapUsed": 6146816,
+    "heapTotal": 9572352,
+    "scrollbackBytes": 1025,
+    "scrollbackChunksCount": 4
+  },
+  "postStreamNoGc": {
+    "rss": 111329280,
+    "heapUsed": 18046632,
+    "heapTotal": 42352640,
+    "scrollbackBytes": 523053,
+    "scrollbackChunksCount": 19560
+  },
+  "postGc": {
+    "rss": 111329280,
+    "heapUsed": 8661504,
+    "heapTotal": 37371904,
+    "scrollbackBytes": 523053,
+    "scrollbackChunksCount": 19560,
+    "maxObservedScrollbackBytes": 524288,
+    "scrollbackExceededCount": 0
+  },
+  "timeline": [
+    {
+      "elapsedSec": 5,
+      "rss": 84439040,
+      "heapUsed": 8524840,
+      "heapTotal": 16912384,
+      "scrollbackBytes": 520343,
+      "actualSumBytes": 520343,
+      "scrollbackChunksCount": 11859,
+      "totalBytesReceived": 4040467,
+      "scrollbackExceededCount": 0
+    },
+    {
+      "elapsedSec": 10,
+      "rss": 92659712,
+      "heapUsed": 15819816,
+      "heapTotal": 24186880,
+      "scrollbackBytes": 524276,
+      "actualSumBytes": 524276,
+      "scrollbackChunksCount": 28638,
+      "totalBytesReceived": 4966197,
+      "scrollbackExceededCount": 0
+    },
+    {
+      "elapsedSec": 15,
+      "rss": 93184000,
+      "heapUsed": 16466904,
+      "heapTotal": 24973312,
+      "scrollbackBytes": 524281,
+      "actualSumBytes": 524281,
+      "scrollbackChunksCount": 25810,
+      "totalBytesReceived": 5534078,
+      "scrollbackExceededCount": 0
+    },
+    {
+      "elapsedSec": 20,
+      "rss": 94625792,
+      "heapUsed": 15834880,
+      "heapTotal": 26284032,
+      "scrollbackBytes": 522732,
+      "actualSumBytes": 522732,
+      "scrollbackChunksCount": 22658,
+      "totalBytesReceived": 6198728,
+      "scrollbackExceededCount": 0
+    },
+    {
+      "elapsedSec": 25,
+      "rss": 95543296,
+      "heapUsed": 13718584,
+      "heapTotal": 26808320,
+      "scrollbackBytes": 523010,
+      "actualSumBytes": 523010,
+      "scrollbackChunksCount": 22905,
+      "totalBytesReceived": 6835511,
+      "scrollbackExceededCount": 0
+    },
+    {
+      "elapsedSec": 30,
+      "rss": 102154240,
+      "heapUsed": 14213392,
+      "heapTotal": 33177600,
+      "scrollbackBytes": 524284,
+      "actualSumBytes": 524284,
+      "scrollbackChunksCount": 23066,
+      "totalBytesReceived": 7490292,
+      "scrollbackExceededCount": 0
+    },
+    {
+      "elapsedSec": 35,
+      "rss": 109363200,
+      "heapUsed": 18521160,
+      "heapTotal": 40517632,
+      "scrollbackBytes": 524284,
+      "actualSumBytes": 524284,
+      "scrollbackChunksCount": 25263,
+      "totalBytesReceived": 8251905,
+      "scrollbackExceededCount": 0
+    },
+    {
+      "elapsedSec": 40,
+      "rss": 109625344,
+      "heapUsed": 15966120,
+      "heapTotal": 40517632,
+      "scrollbackBytes": 524288,
+      "actualSumBytes": 524288,
+      "scrollbackChunksCount": 25212,
+      "totalBytesReceived": 8872845,
+      "scrollbackExceededCount": 0
+    },
+    {
+      "elapsedSec": 45,
+      "rss": 109887488,
+      "heapUsed": 16283368,
+      "heapTotal": 40517632,
+      "scrollbackBytes": 524281,
+      "actualSumBytes": 524281,
+      "scrollbackChunksCount": 23909,
+      "totalBytesReceived": 9555101,
+      "scrollbackExceededCount": 0
+    },
+    {
+      "elapsedSec": 50,
+      "rss": 110018560,
+      "heapUsed": 19967280,
+      "heapTotal": 40517632,
+      "scrollbackBytes": 524274,
+      "actualSumBytes": 524274,
+      "scrollbackChunksCount": 23761,
+      "totalBytesReceived": 10024938,
+      "scrollbackExceededCount": 0
+    },
+    {
+      "elapsedSec": 55,
+      "rss": 110936064,
+      "heapUsed": 15463312,
+      "heapTotal": 41828352,
+      "scrollbackBytes": 523506,
+      "actualSumBytes": 523506,
+      "scrollbackChunksCount": 21919,
+      "totalBytesReceived": 10605574,
+      "scrollbackExceededCount": 0
+    },
+    {
+      "elapsedSec": 60,
+      "rss": 111329280,
+      "heapUsed": 17984280,
+      "heapTotal": 42352640,
+      "scrollbackBytes": 524285,
+      "actualSumBytes": 524285,
+      "scrollbackChunksCount": 19924,
+      "totalBytesReceived": 11057509,
+      "scrollbackExceededCount": 0
+    }
+  ],
+  "verifications": {
+    "ringBufferCapHonored": true,
+    "maxObservedBytes": 524288,
+    "invariantViolationCount": 0,
+    "garbageCollectionReclaimedBytes": 9385128,
+    "buffersProperlyGarbageCollected": true,
+    "zeroMemoryLeak": true
+  }
+}

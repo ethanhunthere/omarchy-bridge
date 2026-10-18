@@ -1,6 +1,6 @@
 /**
  * Omarchy Linux Remote CLI Bridge & Mission Control Daemon
- * High-Speed, Non-Blocking Architecture
+ * High-Speed, Non-Blocking, Fully Hardened Architecture
  */
 
 const http = require('http');
@@ -10,6 +10,8 @@ const dgram = require('dgram');
 const { exec, spawn } = require('child_process');
 const pty = require('node-pty');
 const { WebSocketServer, WebSocket } = require('ws');
+const { Terminal: HeadlessTerminal } = require('@xterm/headless');
+const { SerializeAddon } = require('@xterm/addon-serialize');
 require('dotenv').config();
 
 // ==========================================
@@ -49,7 +51,25 @@ process.env.XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME || '/home/f0id/.config
 process.env.TERM = 'xterm-256color';
 process.env.COLORTERM = 'truecolor';
 
+if (!process.env.HYPRLAND_INSTANCE_SIGNATURE) {
+  try {
+    const hyprDir = `${process.env.XDG_RUNTIME_DIR || '/run/user/1000'}/hypr`;
+    if (fs.existsSync(hyprDir)) {
+      const sigs = fs.readdirSync(hyprDir).filter((f) => !f.startsWith('.'));
+      if (sigs.length > 0) process.env.HYPRLAND_INSTANCE_SIGNATURE = sigs[0];
+    }
+  } catch (e) {}
+}
+
 let AUTH_TOKEN = process.env.AUTH_TOKEN || 'omarchy-bridge-secure-key-2026';
+
+function safeParseUrl(urlStr, hostHeader) {
+  try {
+    return new URL(urlStr, `http://${hostHeader || 'localhost'}`);
+  } catch (e) {
+    return null;
+  }
+}
 
 // ==========================================
 // 2. High-Performance Circular Scrollback
@@ -57,58 +77,142 @@ let AUTH_TOKEN = process.env.AUTH_TOKEN || 'omarchy-bridge-secure-key-2026';
 const MAX_SCROLLBACK_BYTES = 512 * 1024; // 512 KB
 let scrollbackChunks = [];
 let scrollbackBytes = 0;
+let maxObservedScrollbackBytes = 0;
+let scrollbackExceededCount = 0;
 
 function appendScrollback(chunk) {
   const bytes = Buffer.byteLength(chunk, 'utf8');
   scrollbackChunks.push({ data: chunk, bytes });
   scrollbackBytes += bytes;
 
-  while (scrollbackBytes > MAX_SCROLLBACK_BYTES && scrollbackChunks.length > 0) {
-    const rem = scrollbackChunks.shift();
-    scrollbackBytes -= rem.bytes;
+  // Evict in chunks to avoid array shift overhead
+  if (scrollbackBytes > MAX_SCROLLBACK_BYTES) {
+    let excess = scrollbackBytes - MAX_SCROLLBACK_BYTES;
+    let removeCount = 0;
+    for (let i = 0; i < scrollbackChunks.length; i++) {
+      excess -= scrollbackChunks[i].bytes;
+      removeCount++;
+      if (excess <= 0) break;
+    }
+    const removed = scrollbackChunks.splice(0, removeCount);
+    for (const r of removed) scrollbackBytes -= r.bytes;
+  }
+
+  if (scrollbackBytes > MAX_SCROLLBACK_BYTES) {
+    scrollbackExceededCount++;
+  }
+  if (scrollbackBytes > maxObservedScrollbackBytes) {
+    maxObservedScrollbackBytes = scrollbackBytes;
   }
 }
 
 function getRecentScrollback(maxBytes = 32768) {
-  let acc = '';
+  const selected = [];
+  let bytesCount = 0;
   for (let i = scrollbackChunks.length - 1; i >= 0; i--) {
-    acc = scrollbackChunks[i].data + acc;
-    if (Buffer.byteLength(acc, 'utf8') >= maxBytes) break;
+    selected.unshift(scrollbackChunks[i].data);
+    bytesCount += scrollbackChunks[i].bytes;
+    if (bytesCount >= maxBytes) break;
   }
-  return acc;
+  return selected.join('');
+}
+
+// Headless terminal emulator to maintain clean 2D screen buffer
+const headlessTerm = new HeadlessTerminal({
+  cols: 80,
+  rows: 30,
+  allowProposedApi: true,
+  scrollback: 5000,
+});
+const serializeAddon = new SerializeAddon();
+headlessTerm.loadAddon(serializeAddon);
+
+function getCleanScreenLines() {
+  const lines = [];
+  const buffer = headlessTerm.buffer.active;
+  const numRows = headlessTerm.rows;
+  for (let y = 0; y < numRows; y++) {
+    const line = buffer.getLine(buffer.baseY + y);
+    if (line) {
+      lines.push(line.translateToString(true));
+    }
+  }
+  while (lines.length > 0 && lines[lines.length - 1].trim() === '') {
+    lines.pop();
+  }
+  return lines;
 }
 
 // ==========================================
 // 3. Persistent Headless tmux Engine
 // ==========================================
 function ensureTmuxSession() {
-  exec(`tmux has-session -t ${TMUX_SESSION} 2>/dev/null`, (err) => {
-    if (err) {
-      console.log(`[TMUX] Spawning detached session: ${TMUX_SESSION} (${USER_SHELL} -l)`);
-      exec(
-        `tmux set-environment -g PATH "${process.env.PATH}"; ` +
-          `tmux set-environment -g DBUS_SESSION_BUS_ADDRESS "${process.env.DBUS_SESSION_BUS_ADDRESS}"; ` +
-          `tmux set-environment -g XDG_RUNTIME_DIR "${process.env.XDG_RUNTIME_DIR}"; ` +
-          `tmux new-session -d -s ${TMUX_SESSION} -n "terminal" -c "${WORK_DIR}" "${USER_SHELL} -l"; ` +
-          `tmux set-option -t ${TMUX_SESSION} status off; ` +
-          `tmux set-option -t ${TMUX_SESSION} default-terminal "xterm-256color"`,
-        (e) => {
-          if (e) console.error('[TMUX] Init error:', e.message);
-        }
+  try {
+    const { execSync } = require('child_process');
+    execSync(`tmux has-session -t ${TMUX_SESSION} 2>/dev/null`);
+  } catch (err) {
+    console.log(`[TMUX] Spawning detached session: ${TMUX_SESSION} (${USER_SHELL} -l)`);
+    try {
+      const { execSync } = require('child_process');
+      execSync(
+        `tmux new-session -d -s ${TMUX_SESSION} -n "terminal" -c "${WORK_DIR}" "${USER_SHELL} -l" 2>/dev/null; ` +
+          `tmux set-option -t ${TMUX_SESSION} status off 2>/dev/null; ` +
+          `tmux set-option -t ${TMUX_SESSION} default-terminal "xterm-256color" 2>/dev/null`
       );
+    } catch (e) {
+      console.error('[TMUX] Init error:', e.message);
     }
-  });
+  }
 }
 
 ensureTmuxSession();
 
 // ==========================================
-// 4. Zero-Delay PTY Process
+// 4. Zero-Delay PTY Process with Backpressure
 // ==========================================
 let ptyProcess = null;
 const clients = new Set();
+let ptyPaused = false;
+let backpressureEvents = 0;
+
+function checkBackpressure() {
+  if (!ptyProcess) return;
+
+  let maxBuffered = 0;
+  for (const client of clients) {
+    if (client.readyState === WebSocket.OPEN) {
+      if (client.bufferedAmount > maxBuffered) {
+        maxBuffered = client.bufferedAmount;
+      }
+    }
+  }
+
+  // Instant backpressure handling:
+  // Pause PTY stream if WebSocket send buffer exceeds 128KB (ideal for mobile bandwidth)
+  if (!ptyPaused && maxBuffered >= 128 * 1024) {
+    ptyPaused = true;
+    backpressureEvents++;
+    try {
+      ptyProcess.pause();
+    } catch (e) {}
+  } else if (ptyPaused && maxBuffered <= 32 * 1024) {
+    ptyPaused = false;
+    try {
+      ptyProcess.resume();
+    } catch (e) {}
+  }
+}
+
+// Rapid unpause monitor
+setInterval(() => {
+  if (ptyPaused) {
+    checkBackpressure();
+  }
+}, 25);
 
 function spawnPty(cols = 80, rows = 30) {
+  ensureTmuxSession();
+
   if (ptyProcess) {
     try {
       ptyProcess.kill();
@@ -129,6 +233,8 @@ function spawnPty(cols = 80, rows = 30) {
     },
   });
 
+  ptyPaused = false;
+
   ptyProcess.onData((data) => {
     // Auto-respond to terminal feature probes (avoids shell hangs)
     if (
@@ -147,6 +253,10 @@ function spawnPty(cols = 80, rows = 30) {
       }
     }
 
+    try {
+      headlessTerm.write(data);
+    } catch (e) {}
+
     appendScrollback(data);
 
     // Direct immediate broadcast (zero latency)
@@ -154,19 +264,31 @@ function spawnPty(cols = 80, rows = 30) {
       const payload = JSON.stringify({ type: 'output', data });
       for (const client of clients) {
         if (client.readyState === WebSocket.OPEN) {
-          client.send(payload);
+          client.send(payload, (err) => {
+            if (err) clients.delete(client);
+          });
+        } else {
+          clients.delete(client);
         }
       }
+      checkBackpressure();
     }
   });
 
   ptyProcess.onExit(({ exitCode }) => {
+    ensureTmuxSession();
     const payload = JSON.stringify({
       type: 'status',
       message: `\r\n\x1b[33m[Session reconnecting to ${TMUX_SESSION}...]\x1b[0m\r\n`,
     });
     for (const client of clients) {
-      if (client.readyState === WebSocket.OPEN) client.send(payload);
+      if (client.readyState === WebSocket.OPEN) {
+        client.send(payload, (err) => {
+          if (err) clients.delete(client);
+        });
+      } else {
+        clients.delete(client);
+      }
     }
     setTimeout(() => spawnPty(cols, rows), 800);
   });
@@ -256,19 +378,57 @@ function getCpuPercent() {
   return dTotal > 0 ? Math.min(100, Math.max(0, Math.round(100 - (100 * dIdle) / dTotal))) : 0;
 }
 
+let lastCpuPerCore = null;
+function getPerCoreCpu() {
+  const cpus = os.cpus();
+  if (!lastCpuPerCore || lastCpuPerCore.length !== cpus.length) {
+    lastCpuPerCore = cpus.map((c) => ({
+      idle: c.times.idle,
+      total: Object.values(c.times).reduce((a, b) => a + b, 0),
+    }));
+    return cpus.map(() => 0);
+  }
+
+  const results = [];
+  for (let i = 0; i < cpus.length; i++) {
+    const tot = Object.values(cpus[i].times).reduce((a, b) => a + b, 0);
+    const idl = cpus[i].times.idle;
+    const dTot = tot - lastCpuPerCore[i].total;
+    const dIdl = idl - lastCpuPerCore[i].idle;
+    lastCpuPerCore[i] = { idle: idl, total: tot };
+    results.push(dTot <= 0 ? 0 : Math.min(100, Math.max(0, Math.round(100 - (100 * dIdl) / dTot))));
+  }
+  return results;
+}
+
+function getDiskUsage() {
+  try {
+    const s = fs.statfsSync('/');
+    const totalGb = Math.round((s.bsize * s.blocks) / (1024 ** 3));
+    const usedGb = Math.round((s.bsize * (s.blocks - s.bfree)) / (1024 ** 3));
+    const percent = totalGb > 0 ? Math.round((usedGb / totalGb) * 100) : 0;
+    return { totalGb, usedGb, percent };
+  } catch (e) {
+    return { totalGb: 0, usedGb: 0, percent: 0 };
+  }
+}
+
 function getLightTelemetry() {
   const totalMem = os.totalmem();
   const freeMem = os.freemem();
   const usedMem = totalMem - freeMem;
+  const cpuCores = getPerCoreCpu();
 
   return {
     cpuPercent: getCpuPercent(),
+    cpuCores: cpuCores,
     cpuTemp: getCpuTemp(),
     memory: {
       usedGb: (usedMem / 1024 / 1024 / 1024).toFixed(1),
       totalGb: (totalMem / 1024 / 1024 / 1024).toFixed(1),
       percent: Math.round((usedMem / totalMem) * 100),
     },
+    disk: getDiskUsage(),
     battery: getBattery(),
     netSpeed: getNetworkSpeed(),
     uptimeSeconds: Math.floor(os.uptime()),
@@ -286,11 +446,24 @@ setInterval(() => {
     const payload = JSON.stringify({ type: 'telemetry', data });
     for (const client of clients) {
       if (client.readyState === WebSocket.OPEN) {
-        client.send(payload);
+        client.send(payload, (err) => {
+          if (err) clients.delete(client);
+        });
+      } else {
+        clients.delete(client);
       }
     }
   }
 }, 4000);
+
+// Heartbeat to clean dead sockets
+setInterval(() => {
+  for (const client of clients) {
+    if (client.readyState !== WebSocket.OPEN) {
+      clients.delete(client);
+    }
+  }
+}, 15000);
 
 // ==========================================
 // 6. Direct System Power & Action Handlers
@@ -308,11 +481,20 @@ function sendWakeOnLan(targetMac = PRIMARY_MAC) {
       for (let i = 0; i < 16; i++) macBuffer.copy(magicPacket, 6 + i * 6);
 
       const socket = dgram.createSocket('udp4');
+      socket.on('error', (err) => {
+        try {
+          socket.close();
+        } catch (e) {}
+        reject(err);
+      });
+
       socket.bind(() => {
         socket.setBroadcast(true);
         socket.send(magicPacket, 0, magicPacket.length, 9, '255.255.255.255', () => {
           socket.send(magicPacket, 0, magicPacket.length, 9, '192.168.1.255', () => {
-            socket.close();
+            try {
+              socket.close();
+            } catch (e) {}
             resolve({ success: true, mac: targetMac });
           });
         });
@@ -327,35 +509,30 @@ function handleAction(action, payload = {}) {
   console.log(`[ACTION] Executing: ${action}`);
 
   switch (action) {
-    // 1. Instant Shutdown
     case 'poweroff':
     case 'shutdown':
       setTimeout(() => {
-        exec('systemctl poweroff || sudo systemctl poweroff');
+        exec('systemctl poweroff --no-ask-password || sudo -n systemctl poweroff');
       }, 300);
       return { success: true, message: 'Shutting down Omarchy PC now...' };
 
-    // 2. Instant Reboot
     case 'reboot':
       setTimeout(() => {
-        exec('systemctl reboot || sudo systemctl reboot');
+        exec('systemctl reboot --no-ask-password || sudo -n systemctl reboot');
       }, 300);
       return { success: true, message: 'Rebooting Omarchy PC now...' };
 
-    // 3. Sleep / Suspend
     case 'suspend':
     case 'sleep':
       setTimeout(() => {
-        exec('systemctl suspend || sudo systemctl suspend');
+        exec('systemctl suspend --no-ask-password || sudo -n systemctl suspend');
       }, 300);
       return { success: true, message: 'Suspending PC into RAM...' };
 
-    // 4. Lock Screen
     case 'lock':
       exec('hyprlock || loginctl lock-session');
       return { success: true, message: 'Desktop locked' };
 
-    // 5. Stealth Mode Toggle (Display Off + Prevent Sleep)
     case 'stealth_toggle':
       stealthActive = !stealthActive;
       dpmsOn = !stealthActive;
@@ -368,6 +545,9 @@ function handleAction(action, payload = {}) {
             'sleep',
             'infinity',
           ]);
+          keepAwakeProcess.on('error', () => {
+            keepAwakeProcess = null;
+          });
         }
       } else {
         exec('hyprctl dispatch dpms on');
@@ -380,13 +560,11 @@ function handleAction(action, payload = {}) {
       }
       return { success: true, stealthMode: stealthActive, dpmsOn };
 
-    // 6. Display Toggle
     case 'dpms_toggle':
       dpmsOn = !dpmsOn;
       exec(`hyprctl dispatch dpms ${dpmsOn ? 'on' : 'off'}`);
       return { success: true, dpmsOn };
 
-    // 7. Dispatch Wake-on-LAN Magic Packet
     case 'send_wol':
       return sendWakeOnLan(payload.mac || PRIMARY_MAC);
 
@@ -399,7 +577,13 @@ function handleAction(action, payload = {}) {
 // 7. HTTP & REST Layer
 // ==========================================
 const server = http.createServer(async (req, res) => {
-  const reqUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const reqUrl = safeParseUrl(req.url, req.headers.host);
+  if (!reqUrl) {
+    res.writeHead(400, { 'Content-Type': 'text/plain' });
+    res.end('Bad Request\n');
+    return;
+  }
+
   const queryToken = reqUrl.searchParams.get('token');
   const authHeader = req.headers['authorization'];
   const token = queryToken || (authHeader ? authHeader.replace(/^Bearer\s+/i, '') : null);
@@ -432,9 +616,48 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (reqUrl.pathname === '/api/screen') {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ lines: getCleanScreenLines() }));
+    return;
+  }
+
+  if (reqUrl.pathname === '/api/memory') {
+    if (reqUrl.searchParams.get('gc') === '1' && typeof global.gc === 'function') {
+      global.gc();
+    }
+    const mem = process.memoryUsage();
+    const actualSumBytes = scrollbackChunks.reduce((acc, c) => acc + c.bytes, 0);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(
+      JSON.stringify({
+        rss: mem.rss,
+        heapTotal: mem.heapTotal,
+        heapUsed: mem.heapUsed,
+        external: mem.external,
+        arrayBuffers: mem.arrayBuffers,
+        scrollbackBytes,
+        actualSumBytes,
+        scrollbackChunksCount: scrollbackChunks.length,
+        maxScrollbackBytes: MAX_SCROLLBACK_BYTES,
+        maxObservedScrollbackBytes,
+        scrollbackExceededCount,
+        ptyPaused,
+        backpressureEvents,
+        activeClients: clients.size,
+      })
+    );
+    return;
+  }
+
   if (reqUrl.pathname === '/api/action' && req.method === 'POST') {
     let body = '';
-    req.on('data', (c) => (body += c));
+    req.on('data', (c) => {
+      body += c;
+      if (body.length > 524288) {
+        req.destroy();
+      }
+    });
     req.on('end', async () => {
       try {
         const payload = JSON.parse(body || '{}');
@@ -453,13 +676,28 @@ const server = http.createServer(async (req, res) => {
   res.end('Omarchy Fast Bridge Running\n');
 });
 
+server.on('error', (err) => {
+  console.error('[SERVER] HTTP Error:', err.message);
+});
+
 // ==========================================
 // 8. WebSocket Upgrade & Client Protocol
 // ==========================================
 const wss = new WebSocketServer({ noServer: true });
 
 server.on('upgrade', (request, socket, head) => {
-  const reqUrl = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
+  socket.on('error', () => {
+    try {
+      socket.destroy();
+    } catch (e) {}
+  });
+
+  const reqUrl = safeParseUrl(request.url, request.headers.host);
+  if (!reqUrl) {
+    socket.destroy();
+    return;
+  }
+
   const queryToken = reqUrl.searchParams.get('token');
   const authHeader = request.headers['authorization'];
   const headerToken = authHeader ? authHeader.replace(/^Bearer\s+/i, '') : null;
@@ -477,9 +715,24 @@ server.on('upgrade', (request, socket, head) => {
 });
 
 wss.on('connection', (ws, req) => {
-  const clientIp = req.socket.remoteAddress;
+  const clientIp = req.socket?.remoteAddress || 'unknown';
   console.log(`[CLIENT] Connected: ${clientIp} (Active: ${clients.size + 1})`);
   clients.add(ws);
+
+  const cleanupClient = () => {
+    if (clients.has(ws)) {
+      clients.delete(ws);
+      console.log(`[CLIENT] Disconnected: ${clientIp} (Remaining: ${clients.size})`);
+    }
+  };
+
+  ws.on('close', cleanupClient);
+  ws.on('error', cleanupClient);
+
+  if (ws.readyState !== WebSocket.OPEN) {
+    cleanupClient();
+    return;
+  }
 
   // Send fast initial snapshot (max 32KB so launch is instant)
   const initialHistory = getRecentScrollback(32768);
@@ -492,7 +745,10 @@ wss.on('connection', (ws, req) => {
       },
       history: initialHistory,
       telemetry: getLightTelemetry(),
-    })
+    }),
+    (err) => {
+      if (err) cleanupClient();
+    }
   );
 
   ws.on('message', async (message) => {
@@ -500,7 +756,6 @@ wss.on('connection', (ws, req) => {
       const parsed = JSON.parse(message.toString());
 
       switch (parsed.type) {
-        // Direct command input
         case 'input':
           if (ptyProcess && typeof parsed.data === 'string') {
             let cmd = parsed.data.replace(/\r?\n$/, '');
@@ -508,14 +763,12 @@ wss.on('connection', (ws, req) => {
           }
           break;
 
-        // Raw input stream
         case 'raw':
           if (ptyProcess && typeof parsed.data === 'string') {
             ptyProcess.write(parsed.data);
           }
           break;
 
-        // Interactive control signals
         case 'signal':
           if (ptyProcess) {
             switch (parsed.signal) {
@@ -540,11 +793,16 @@ wss.on('connection', (ws, req) => {
               case 'arrow_down':
                 ptyProcess.write('\x1b[B');
                 break;
+              case 'arrow_left':
+                ptyProcess.write('\x1b[D');
+                break;
+              case 'arrow_right':
+                ptyProcess.write('\x1b[C');
+                break;
             }
           }
           break;
 
-        // Power actions (shutdown, reboot, suspend, stealth, etc.)
         case 'action':
           try {
             const result = await handleAction(parsed.action, parsed.payload || {});
@@ -555,25 +813,30 @@ wss.on('connection', (ws, req) => {
           }
           break;
 
-        // Resize terminal dimensions
         case 'resize':
           if (ptyProcess && parsed.cols && parsed.rows) {
             const cols = Math.max(10, Math.min(parseInt(parsed.cols, 10), 200));
             const rows = Math.max(5, Math.min(parseInt(parsed.rows, 10), 80));
+            try {
+              headlessTerm.resize(cols, rows);
+            } catch (e) {}
             ptyProcess.resize(cols, rows);
             exec(`tmux resize-window -t ${TMUX_SESSION} -x ${cols} -y ${rows} 2>/dev/null`);
           }
           break;
 
-        // Clear terminal output
         case 'clear':
           scrollbackChunks = [];
           scrollbackBytes = 0;
+          maxObservedScrollbackBytes = 0;
+          scrollbackExceededCount = 0;
+          try {
+            headlessTerm.clear();
+          } catch (e) {}
           ws.send(JSON.stringify({ type: 'cleared' }));
           if (ptyProcess) ptyProcess.write('\x0c');
           break;
 
-        // Latency ping
         case 'ping':
           ws.send(JSON.stringify({ type: 'pong', clientTime: parsed.time, serverTime: Date.now() }));
           break;
@@ -583,15 +846,6 @@ wss.on('connection', (ws, req) => {
         ptyProcess.write(message.toString() + '\r');
       }
     }
-  });
-
-  ws.on('close', () => {
-    clients.delete(ws);
-    console.log(`[CLIENT] Disconnected: ${clientIp} (Remaining: ${clients.size})`);
-  });
-
-  ws.on('error', () => {
-    clients.delete(ws);
   });
 });
 

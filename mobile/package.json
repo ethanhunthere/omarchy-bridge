@@ -8,22 +8,16 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "@expo/vector-icons": "^15.0.2",
     "expo": "~57.0.30",
-    "expo-asset": "~57.0.20",
-    "expo-clipboard": "~57.0.2",
     "expo-constants": "~57.0.22",
     "expo-haptics": "~57.0.3",
-    "expo-status-bar": "~57.0.1",
     "react": "19.2.3",
-    "react-native": "0.86.3",
-    "react-native-safe-area-context": "~5.7.0",
-    "react-native-webview": "13.16.1"
+    "react-native": "0.86.3"
   },
   "devDependencies": {
     "@babel/core": "^7.25.0",
     "@types/react": "~19.2.4",
-    "typescript": "^5.6.3"
+    "typescript": "~6.0.3"
   },
   "private": true
 }

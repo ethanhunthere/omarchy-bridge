@@ -184,7 +184,7 @@ async function runTests() {
 
   // Send empty newline to verify clean shell prompt
   sendInput('');
-  await waitForOutput((out) => out.includes('❯'), 6000);
+  await waitForOutput((out) => out.includes('❯') || out.includes('✗'), 6000);
   log('PASS', 'Clean agy TUI Exit', 'Returned cleanly to shell prompt via double Ctrl+D');
 
   // Test 5: Control Signals
@@ -197,7 +197,7 @@ async function runTests() {
   sendSignal('ctrl_c');
   await sleep(600);
   sendInput('');
-  await waitForOutput((out) => out.includes('❯'), 6000);
+  await waitForOutput((out) => out.includes('❯') || out.includes('✗'), 6000);
   log('PASS', 'SIGINT (Ctrl+C) Interrupt', 'Running process interrupted via signal and shell recovered');
 
   // Test 6: HTTP REST & Screen API

@@ -21,12 +21,18 @@ import * as Haptics from 'expo-haptics';
 const FIXED_AUTH_TOKEN = 'omarchy-bridge-secure-key-2026';
 const BRIDGE_PORT = 19001;
 
+interface LegacyConstants {
+  manifest?: { debuggerHost?: string };
+  manifest2?: { extra?: { expoGo?: { debuggerHost?: string } } };
+}
+
 function resolveCandidateHosts(): string[] {
   const hosts: string[] = [];
+  const legacyConstants = Constants as unknown as LegacyConstants;
   const hostUri =
     Constants.expoConfig?.hostUri ||
-    (Constants as any).manifest?.debuggerHost ||
-    (Constants as any).manifest2?.extra?.expoGo?.debuggerHost;
+    legacyConstants.manifest?.debuggerHost ||
+    legacyConstants.manifest2?.extra?.expoGo?.debuggerHost;
 
   if (hostUri) {
     const detectedIp = hostUri.split(':')[0];
@@ -42,7 +48,7 @@ function resolveCandidateHosts(): string[] {
 }
 
 // ==========================================
-// 2. Fast Lightweight ANSI Parser
+// 2. High-Speed ANSI Color Translator
 // ==========================================
 interface StyledSegment {
   text: string;
@@ -51,33 +57,31 @@ interface StyledSegment {
 }
 
 const ANSI_COLOR_MAP: Record<number, string> = {
-  30: '#64748b',
-  31: '#f87171',
-  32: '#4ade80',
-  33: '#fbbf24',
-  34: '#60a5fa',
-  35: '#c084fc',
-  36: '#38bdf8',
-  37: '#f1f5f9',
-  90: '#475569',
-  91: '#ef4444',
-  92: '#22c55e',
-  93: '#eab308',
-  94: '#3b82f6',
-  95: '#a855f7',
-  96: '#06b6d4',
+  30: '#71717a',
+  31: '#ef4444',
+  32: '#22c55e',
+  33: '#eab308',
+  34: '#3b82f6',
+  35: '#a855f7',
+  36: '#06b6d4',
+  37: '#f4f4f5',
+  90: '#52525b',
+  91: '#f87171',
+  92: '#4ade80',
+  93: '#fde047',
+  94: '#60a5fa',
+  95: '#c084fc',
+  96: '#22d3ee',
   97: '#ffffff',
 };
 
 function parseAnsi(rawText: string): StyledSegment[] {
-  // Clean out common screen/cursor escape sequences that cause text jitter
   const sanitized = rawText
     .replace(/\x1b\[\?1049[hl]/g, '')
     .replace(/\x1b\[\?25[hl]/g, '')
     .replace(/\x1b\[2J/g, '\n')
     .replace(/\x1b\[H/g, '')
     .replace(/\x1b\[[0-9;]*[a-zA-Z]/g, (match) => {
-      // Keep color 'm' sequences, strip other VT controls
       return match.endsWith('m') ? match : '';
     });
 
@@ -85,7 +89,7 @@ function parseAnsi(rawText: string): StyledSegment[] {
   const segments: StyledSegment[] = [];
 
   let lastIndex = 0;
-  let currentColor: string = '#e2e8f0';
+  let currentColor = '#e4e4e7';
   let isBold = false;
 
   let match: RegExpExecArray | null;
@@ -100,7 +104,7 @@ function parseAnsi(rawText: string): StyledSegment[] {
 
     for (const code of codes) {
       if (code === 0) {
-        currentColor = '#e2e8f0';
+        currentColor = '#e4e4e7';
         isBold = false;
       } else if (code === 1) {
         isBold = true;
@@ -120,7 +124,7 @@ function parseAnsi(rawText: string): StyledSegment[] {
 }
 
 // ==========================================
-// 3. Main Fast Application Component
+// 3. Main Industrial Minimalist Component
 // ==========================================
 export default function App() {
   const candidateHosts = useMemo(() => resolveCandidateHosts(), []);
@@ -130,14 +134,14 @@ export default function App() {
   const [status, setStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
   const [latency, setLatency] = useState<number | null>(null);
 
-  // Terminal Buffer
+  // Terminal State
   const [terminalText, setTerminalText] = useState<string>('');
   const [inputCommand, setInputCommand] = useState('');
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [autoScroll, setAutoScroll] = useState(true);
 
-  // Telemetry HUD
+  // Telemetry
   const [telemetry, setTelemetry] = useState<{
     cpuPercent?: number;
     cpuTemp?: number | null;
@@ -148,7 +152,7 @@ export default function App() {
     uptimeSeconds?: number;
   } | null>(null);
 
-  // Power Action Confirmation Modal
+  // Confirmation Modal
   const [confirmModal, setConfirmModal] = useState<{
     visible: boolean;
     title: string;
@@ -163,17 +167,16 @@ export default function App() {
     isDanger: false,
   });
 
-  // Refs for low-latency batching
+  // Low-latency Refs
   const socketRef = useRef<WebSocket | null>(null);
   const scrollViewRef = useRef<ScrollView | null>(null);
   const incomingBufferRef = useRef('');
-  const flushTimeoutRef = useRef<any>(null);
-  const pingIntervalRef = useRef<any>(null);
-  const reconnectTimeoutRef = useRef<any>(null);
+  const flushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hostIndexRef = useRef(0);
   const isMountedRef = useRef(true);
 
-  // Haptic feedback
   const triggerHaptic = (type: 'light' | 'medium' | 'warning' = 'light') => {
     try {
       if (type === 'light') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -182,7 +185,7 @@ export default function App() {
     } catch (e) {}
   };
 
-  // High-frequency PTY buffer flusher (30ms batching prevents React Native freezing)
+  // 30ms batching prevents React Native bridge flooding
   const appendOutputChunk = useCallback((chunk: string) => {
     incomingBufferRef.current += chunk;
     if (!flushTimeoutRef.current) {
@@ -191,14 +194,12 @@ export default function App() {
           const next = prev + incomingBufferRef.current;
           incomingBufferRef.current = '';
           flushTimeoutRef.current = null;
-          // Keep the last 30,000 characters for high-speed scrolling
           return next.length > 30000 ? next.slice(-30000) : next;
         });
       }, 30);
     }
   }, []);
 
-  // Stable WebSocket connection
   const connect = useCallback(() => {
     if (!isMountedRef.current) return;
     if (
@@ -288,7 +289,6 @@ export default function App() {
     };
   }, [connect]);
 
-  // Command & signal dispatchers (immediate WebSocket writes)
   const sendCommand = (cmd: string = inputCommand) => {
     triggerHaptic('light');
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
@@ -312,7 +312,7 @@ export default function App() {
     }
   };
 
-  const dispatchAction = (action: string, payload: any = {}) => {
+  const dispatchAction = (action: string, payload: Record<string, unknown> = {}) => {
     triggerHaptic('medium');
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify({ type: 'action', action, payload }));
@@ -352,9 +352,9 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#07090e" />
+      <StatusBar barStyle="light-content" backgroundColor="#0a0b0d" />
 
-      {/* Top Header Bar */}
+      {/* Clean Industrial Header Bar (No AI glow, no cyberpunk) */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <View
@@ -365,42 +365,44 @@ export default function App() {
               status === 'disconnected' && styles.statusDisconnected,
             ]}
           />
-          <Text style={styles.headerTitle}>
-            {status === 'connected' ? 'OMARCHY' : status === 'connecting' ? 'CONNECTING...' : 'OFFLINE'}
-          </Text>
-          {latency !== null && <Text style={styles.latencyBadge}>{latency}ms</Text>}
+          <Text style={styles.headerTitle}>omarchy-remote</Text>
+          {latency !== null && (
+            <View style={styles.latencyPill}>
+              <Text style={styles.latencyText}>{latency}ms</Text>
+            </View>
+          )}
         </View>
 
-        {/* Quick View Toggle */}
-        <View style={styles.tabContainer}>
+        {/* Clean Segmented Control */}
+        <View style={styles.segmentedControl}>
           <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'terminal' && styles.tabButtonActive]}
+            style={[styles.segmentBtn, activeTab === 'terminal' && styles.segmentBtnActive]}
             onPress={() => {
               triggerHaptic('light');
               setActiveTab('terminal');
             }}
           >
-            <Text style={[styles.tabButtonText, activeTab === 'terminal' && styles.tabButtonTextActive]}>
+            <Text style={[styles.segmentText, activeTab === 'terminal' && styles.segmentTextActive]}>
               TERMINAL
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'power' && styles.tabButtonActive]}
+            style={[styles.segmentBtn, activeTab === 'power' && styles.segmentBtnActive]}
             onPress={() => {
               triggerHaptic('light');
               setActiveTab('power');
             }}
           >
-            <Text style={[styles.tabButtonText, activeTab === 'power' && styles.tabButtonTextActive]}>
-              ⏻ POWER
+            <Text style={[styles.segmentText, activeTab === 'power' && styles.segmentTextActive]}>
+              POWER
             </Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {/* ==================================================== */}
-      {/* 1. INSTANT TERMINAL VIEW                             */}
+      {/* VIEW 1: TERMINAL                                     */}
       {/* ==================================================== */}
       {activeTab === 'terminal' && (
         <View style={styles.flexOne}>
@@ -419,7 +421,7 @@ export default function App() {
                 <Text
                   key={idx}
                   style={{
-                    color: seg.color || '#e2e8f0',
+                    color: seg.color || '#e4e4e7',
                     fontWeight: seg.bold ? '700' : '400',
                   }}
                 >
@@ -429,88 +431,80 @@ export default function App() {
             </Text>
           </ScrollView>
 
-          {/* Floating Above-Keyboard Action Ribbon */}
+          {/* Minimal Keycaps Ribbon */}
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 10 : 0}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}
           >
-            <View style={styles.controlBar}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.controlScroll}>
-                <TouchableOpacity style={[styles.keyButton, styles.dangerKey]} onPress={() => sendSignal('ctrl_c')}>
-                  <Text style={styles.dangerKeyText}>Ctrl+C</Text>
+            <View style={styles.keycapRibbon}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ribbonScroll}>
+                <TouchableOpacity style={[styles.keycap, styles.keycapCtrlC]} onPress={() => sendSignal('ctrl_c')}>
+                  <Text style={styles.keycapCtrlCText}>Ctrl+C</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={[styles.keyButton, styles.specialKey]} onPress={() => sendSignal('esc')}>
-                  <Text style={styles.specialKeyText}>ESC</Text>
+                <TouchableOpacity style={[styles.keycap, styles.keycapCtrlD]} onPress={() => sendSignal('ctrl_d')}>
+                  <Text style={styles.keycapCtrlDText}>Ctrl+D</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.keyButton} onPress={() => sendSignal('tab')}>
-                  <Text style={styles.keyButtonText}>TAB</Text>
+                <TouchableOpacity style={styles.keycap} onPress={() => sendSignal('esc')}>
+                  <Text style={styles.keycapText}>ESC</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.keyButton}
-                  onPress={() => {
-                    sendSignal('arrow_up');
-                    handleHistoryNav('up');
-                  }}
-                >
-                  <Text style={styles.arrowKeyText}>▲</Text>
+                <TouchableOpacity style={styles.keycap} onPress={() => sendSignal('tab')}>
+                  <Text style={styles.keycapText}>TAB</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.keyButton}
-                  onPress={() => {
-                    sendSignal('arrow_down');
-                    handleHistoryNav('down');
-                  }}
-                >
-                  <Text style={styles.arrowKeyText}>▼</Text>
+                <TouchableOpacity style={styles.keycap} onPress={() => sendSignal('arrow_up')}>
+                  <Text style={styles.keycapText}>▲</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={[styles.keyButton, styles.enterKey]} onPress={() => sendSignal('enter')}>
-                  <Text style={styles.enterKeyText}>ENTER ↵</Text>
+                <TouchableOpacity style={styles.keycap} onPress={() => sendSignal('arrow_down')}>
+                  <Text style={styles.keycapText}>▼</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={[styles.keyButton, styles.toolKey]} onPress={() => sendCommand('agy')}>
-                  <Text style={styles.toolKeyText}>agy</Text>
+                <TouchableOpacity style={[styles.keycap, styles.keycapEnter]} onPress={() => sendSignal('enter')}>
+                  <Text style={styles.keycapEnterText}>Enter ↵</Text>
                 </TouchableOpacity>
 
-                <TouchableOpacity style={styles.keyButton} onPress={clearScreen}>
-                  <Text style={styles.keyButtonText}>clear</Text>
+                <TouchableOpacity style={[styles.keycap, styles.keycapTool]} onPress={() => sendCommand('agy')}>
+                  <Text style={styles.keycapToolText}>agy</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.keycap} onPress={clearScreen}>
+                  <Text style={styles.keycapText}>clear</Text>
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.keyButton, autoScroll ? styles.autoScrollActive : {}]}
+                  style={[styles.keycap, autoScroll ? styles.keycapAutoScroll : {}]}
                   onPress={() => {
                     triggerHaptic('light');
                     setAutoScroll((p) => !p);
                   }}
                 >
-                  <Text style={styles.keyButtonText}>{autoScroll ? 'AUTO-SCROLL: ON' : 'SCROLL: FREE'}</Text>
+                  <Text style={styles.keycapText}>{autoScroll ? 'AUTO-SCROLL' : 'FREE'}</Text>
                 </TouchableOpacity>
               </ScrollView>
             </View>
 
-            {/* Prompt Input Box */}
-            <View style={styles.inputContainer}>
-              <Text style={styles.promptSymbol}>❯</Text>
+            {/* Industrial Minimal Input Bar */}
+            <View style={styles.inputBar}>
+              <Text style={styles.promptChar}>$</Text>
               <TextInput
-                style={styles.textInput}
+                style={styles.inputField}
                 value={inputCommand}
                 onChangeText={setInputCommand}
-                placeholder="Type command or agy prompt..."
-                placeholderTextColor="#475569"
+                placeholder="Type command or prompt..."
+                placeholderTextColor="#52525b"
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="send"
                 onSubmitEditing={() => sendCommand()}
               />
               <TouchableOpacity
-                style={[styles.sendButton, status === 'connected' ? styles.sendButtonActive : styles.sendButtonDisabled]}
+                style={[styles.sendBtn, status === 'connected' ? styles.sendBtnActive : styles.sendBtnDisabled]}
                 onPress={() => sendCommand()}
               >
-                <Text style={styles.sendButtonText}>SEND</Text>
+                <Text style={styles.sendBtnText}>SEND</Text>
               </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
@@ -518,166 +512,166 @@ export default function App() {
       )}
 
       {/* ==================================================== */}
-      {/* 2. INSTANT POWER & SYSTEM HUD VIEW                   */}
+      {/* VIEW 2: MACHINE POWER & HARDWARE                     */}
       {/* ==================================================== */}
       {activeTab === 'power' && (
-        <ScrollView style={styles.powerContainer} contentContainerStyle={styles.powerContent}>
-          {/* Quick HUD Metrics */}
-          <Text style={styles.sectionHeading}>SYSTEM HUD</Text>
-          <View style={styles.hudRow}>
-            <View style={styles.hudCard}>
-              <Text style={styles.hudLabel}>CPU LOAD</Text>
-              <Text style={styles.hudValue}>{telemetry?.cpuPercent !== undefined ? `${telemetry.cpuPercent}%` : '--'}</Text>
+        <ScrollView style={styles.powerView} contentContainerStyle={styles.powerViewContent}>
+          {/* Status HUD Header */}
+          <View style={styles.hudContainer}>
+            <View style={styles.hudCol}>
+              <Text style={styles.hudTitle}>CPU LOAD</Text>
+              <Text style={styles.hudStat}>{telemetry?.cpuPercent !== undefined ? `${telemetry.cpuPercent}%` : '--'}</Text>
               <Text style={styles.hudSub}>{telemetry?.cpuTemp ? `${telemetry.cpuTemp}°C` : 'Normal'}</Text>
             </View>
 
-            <View style={styles.hudCard}>
-              <Text style={styles.hudLabel}>RAM USAGE</Text>
-              <Text style={styles.hudValue}>
-                {telemetry?.memory ? `${telemetry.memory.usedGb}/${telemetry.memory.totalGb}G` : '--'}
+            <View style={styles.hudDivider} />
+
+            <View style={styles.hudCol}>
+              <Text style={styles.hudTitle}>RAM</Text>
+              <Text style={styles.hudStat}>
+                {telemetry?.memory ? `${telemetry.memory.usedGb}G` : '--'}
               </Text>
-              <Text style={styles.hudSub}>{telemetry?.memory ? `${telemetry.memory.percent}% used` : '--'}</Text>
+              <Text style={styles.hudSub}>
+                {telemetry?.memory ? `of ${telemetry.memory.totalGb}G (${telemetry.memory.percent}%)` : '--'}
+              </Text>
             </View>
 
-            <View style={styles.hudCard}>
-              <Text style={styles.hudLabel}>BATTERY / AC</Text>
-              <Text style={styles.hudValue}>{telemetry?.battery ? `${telemetry.battery.level}%` : '--'}</Text>
-              <Text style={styles.hudSub}>{telemetry?.battery?.ac ? '⚡ AC Online' : '🔋 Battery'}</Text>
+            <View style={styles.hudDivider} />
+
+            <View style={styles.hudCol}>
+              <Text style={styles.hudTitle}>BATTERY</Text>
+              <Text style={styles.hudStat}>
+                {telemetry?.battery ? `${telemetry.battery.level}%` : '--'}
+              </Text>
+              <Text style={styles.hudSub}>{telemetry?.battery?.ac ? 'AC Connected' : 'Discharging'}</Text>
             </View>
           </View>
 
-          {/* Primary Machine Power Actions */}
-          <Text style={styles.sectionHeading}>POWER ACTIONS</Text>
+          {/* Machine Power Controls */}
+          <Text style={styles.groupHeading}>MACHINE POWER</Text>
 
-          {/* 1. Shut Down PC */}
+          {/* Shut Down */}
           <TouchableOpacity
-            style={[styles.bigActionButton, styles.shutdownButton]}
+            style={[styles.powerCard, styles.powerCardDanger]}
             onPress={() =>
               promptConfirmation(
-                'Shut Down PC',
-                'Are you sure you want to completely power off your Omarchy Linux PC? It will turn off immediately.',
+                'Shut Down Machine',
+                'This will execute "systemctl poweroff" and cleanly power off the PC.',
                 'poweroff',
                 true
               )
             }
           >
-            <Text style={styles.actionIconLarge}>⏻</Text>
-            <View style={styles.actionTextCol}>
-              <Text style={styles.actionTitleLarge}>SHUT DOWN PC</Text>
-              <Text style={styles.actionDescLarge}>Immediately powers off laptop hardware</Text>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardLabelDanger}>SHUT DOWN PC</Text>
+              <Text style={styles.cmdBadge}>systemctl poweroff</Text>
             </View>
+            <Text style={styles.cardDesc}>Powers down system immediately</Text>
           </TouchableOpacity>
 
-          {/* 2. Reboot PC */}
+          {/* Reboot */}
           <TouchableOpacity
-            style={[styles.bigActionButton, styles.rebootButton]}
+            style={[styles.powerCard, styles.powerCardWarning]}
             onPress={() =>
               promptConfirmation(
-                'Reboot System',
-                'Restart your Omarchy Linux PC remotely? The bridge daemon will come back online automatically on boot.',
+                'Reboot Machine',
+                'This will execute "systemctl reboot" and restart the PC. Bridge will auto-reconnect on boot.',
                 'reboot',
                 true
               )
             }
           >
-            <Text style={styles.actionIconLarge}>🔄</Text>
-            <View style={styles.actionTextCol}>
-              <Text style={styles.actionTitleLarge}>REBOOT PC</Text>
-              <Text style={styles.actionDescLarge}>Performs clean system reboot</Text>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardLabelWarning}>REBOOT SYSTEM</Text>
+              <Text style={styles.cmdBadge}>systemctl reboot</Text>
             </View>
+            <Text style={styles.cardDesc}>Clean system restart</Text>
           </TouchableOpacity>
 
-          {/* 3. Suspend / Sleep */}
+          {/* Suspend */}
           <TouchableOpacity
-            style={[styles.bigActionButton, styles.suspendButton]}
+            style={styles.powerCard}
             onPress={() =>
               promptConfirmation(
-                'Suspend System',
-                'Put the PC into low-power RAM sleep immediately?',
+                'Suspend Machine',
+                'This will execute "systemctl suspend" to put the PC into low-power RAM sleep.',
                 'suspend',
                 false
               )
             }
           >
-            <Text style={styles.actionIconLarge}>💤</Text>
-            <View style={styles.actionTextCol}>
-              <Text style={styles.actionTitleLarge}>SUSPEND / SLEEP</Text>
-              <Text style={styles.actionDescLarge}>Puts system into low-power sleep mode</Text>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardLabel}>SLEEP / SUSPEND</Text>
+              <Text style={styles.cmdBadge}>systemctl suspend</Text>
             </View>
+            <Text style={styles.cardDesc}>Low-power memory standby</Text>
           </TouchableOpacity>
 
-          {/* 4. Stealth Mode (Screen Off + Stay Awake) */}
+          {/* Stealth Display Mode */}
+          <Text style={styles.groupHeading}>DISPLAY & REMOTE SESSION</Text>
+
           <TouchableOpacity
-            style={[
-              styles.bigActionButton,
-              telemetry?.stealthMode ? styles.stealthActiveButton : styles.stealthInactiveButton,
-            ]}
+            style={[styles.powerCard, telemetry?.stealthMode ? styles.powerCardActive : {}]}
             onPress={() => dispatchAction('stealth_toggle')}
           >
-            <Text style={styles.actionIconLarge}>{telemetry?.stealthMode ? '🌙' : '☀️'}</Text>
-            <View style={styles.actionTextCol}>
-              <Text style={styles.actionTitleLarge}>
-                {telemetry?.stealthMode ? 'STEALTH MODE: ACTIVE (SCREEN OFF)' : 'TURN SCREEN OFF (STEALTH)'}
+            <View style={styles.cardHeader}>
+              <Text style={telemetry?.stealthMode ? styles.cardLabelActive : styles.cardLabel}>
+                {telemetry?.stealthMode ? 'STEALTH MODE: ACTIVE' : 'STEALTH SCREEN OFF'}
               </Text>
-              <Text style={styles.actionDescLarge}>
-                {telemetry?.stealthMode
-                  ? 'Monitor is dark; laptop stays awake so you can work.'
-                  : 'Blacks out laptop screen via DPMS while keeping CLI awake.'}
-              </Text>
+              <Text style={styles.cmdBadge}>hyprctl dpms off</Text>
             </View>
+            <Text style={styles.cardDesc}>
+              {telemetry?.stealthMode
+                ? 'Physical screen is blacked out; systemd-inhibit blocks idle sleep.'
+                : 'Turn off physical monitor while keeping background tasks running.'}
+            </Text>
           </TouchableOpacity>
 
-          {/* 5. Wake-on-LAN Magic Packet */}
-          <TouchableOpacity
-            style={[styles.bigActionButton, styles.wolButton]}
-            onPress={() => dispatchAction('send_wol')}
-          >
-            <Text style={styles.actionIconLarge}>📡</Text>
-            <View style={styles.actionTextCol}>
-              <Text style={styles.actionTitleLarge}>SEND WAKE-ON-LAN</Text>
-              <Text style={styles.actionDescLarge}>Dispatches UDP magic packet to power on/wake PC</Text>
+          {/* Wake-on-LAN */}
+          <TouchableOpacity style={styles.powerCard} onPress={() => dispatchAction('send_wol')}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardLabel}>SEND WAKE-ON-LAN</Text>
+              <Text style={styles.cmdBadge}>UDP magic packet</Text>
             </View>
+            <Text style={styles.cardDesc}>Broadcasts wake signal to network adapter</Text>
           </TouchableOpacity>
 
-          {/* 6. Lock Screen */}
-          <TouchableOpacity
-            style={[styles.bigActionButton, styles.lockButton]}
-            onPress={() => dispatchAction('lock')}
-          >
-            <Text style={styles.actionIconLarge}>🔒</Text>
-            <View style={styles.actionTextCol}>
-              <Text style={styles.actionTitleLarge}>LOCK DESKTOP</Text>
-              <Text style={styles.actionDescLarge}>Triggers hyprlock immediately</Text>
+          {/* Lock Screen */}
+          <TouchableOpacity style={styles.powerCard} onPress={() => dispatchAction('lock')}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardLabel}>LOCK DESKTOP</Text>
+              <Text style={styles.cmdBadge}>hyprlock</Text>
             </View>
+            <Text style={styles.cardDesc}>Locks active Wayland graphical session</Text>
           </TouchableOpacity>
         </ScrollView>
       )}
 
-      {/* Safety Confirmation Modal */}
+      {/* Industrial Minimal Confirmation Dialog */}
       <Modal visible={confirmModal.visible} transparent animationType="fade">
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <Text style={[styles.modalTitle, confirmModal.isDanger && styles.textRed]}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.dialogCard}>
+            <Text style={[styles.dialogTitle, confirmModal.isDanger && styles.textRed]}>
               {confirmModal.title}
             </Text>
-            <Text style={styles.modalDescription}>{confirmModal.description}</Text>
+            <Text style={styles.dialogMessage}>{confirmModal.description}</Text>
 
-            <View style={styles.modalButtonRow}>
+            <View style={styles.dialogActions}>
               <TouchableOpacity
-                style={[styles.dialogButton, styles.dialogCancel]}
+                style={styles.dialogBtnSecondary}
                 onPress={() => setConfirmModal((p) => ({ ...p, visible: false }))}
               >
-                <Text style={styles.dialogCancelText}>Cancel</Text>
+                <Text style={styles.dialogBtnSecondaryText}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={[styles.dialogButton, confirmModal.isDanger ? styles.dialogDanger : styles.dialogConfirm]}
+                style={[styles.dialogBtnPrimary, confirmModal.isDanger ? styles.dialogBtnDanger : {}]}
                 onPress={() => {
                   dispatchAction(confirmModal.action);
                   setConfirmModal((p) => ({ ...p, visible: false }));
                 }}
               >
-                <Text style={styles.dialogConfirmText}>Execute Now</Text>
+                <Text style={styles.dialogBtnPrimaryText}>Execute</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -688,91 +682,99 @@ export default function App() {
 }
 
 // ==========================================
-// 4. Styles (Clean, Obsidian Dark Theme)
+// 4. Styles — Industrial Minimalist Aesthetic
 // ==========================================
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#07090e',
+    backgroundColor: '#0a0b0d',
   },
   flexOne: {
     flex: 1,
   },
+
+  // Header Bar
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 14,
     paddingVertical: 10,
-    backgroundColor: '#0d1117',
+    backgroundColor: '#101116',
     borderBottomWidth: 1,
-    borderBottomColor: '#1e293b',
+    borderBottomColor: '#1e2028',
   },
   headerLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  headerTitle: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#f8fafc',
-    letterSpacing: 1.2,
-  },
-  latencyBadge: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 10,
-    color: '#38bdf8',
-    backgroundColor: '#0c2238',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
   statusDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   statusConnected: {
-    backgroundColor: '#00ff9d',
+    backgroundColor: '#22c55e',
   },
   statusConnecting: {
-    backgroundColor: '#fbbf24',
+    backgroundColor: '#f59e0b',
   },
   statusDisconnected: {
     backgroundColor: '#ef4444',
   },
-  tabContainer: {
+  headerTitle: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#f4f4f5',
+    letterSpacing: 0.5,
+  },
+  latencyPill: {
+    backgroundColor: '#181a22',
+    borderWidth: 1,
+    borderColor: '#262835',
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 3,
+  },
+  latencyText: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 10,
+    color: '#a1a1aa',
+  },
+
+  // Segmented Control
+  segmentedControl: {
     flexDirection: 'row',
-    backgroundColor: '#161b22',
-    borderRadius: 6,
+    backgroundColor: '#161820',
+    borderRadius: 4,
     padding: 2,
     borderWidth: 1,
-    borderColor: '#30363d',
+    borderColor: '#222530',
   },
-  tabButton: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 4,
+  segmentBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 3,
   },
-  tabButtonActive: {
-    backgroundColor: '#00ff9d',
+  segmentBtnActive: {
+    backgroundColor: '#282b37',
   },
-  tabButtonText: {
+  segmentText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '700',
-    color: '#8b949e',
+    color: '#71717a',
   },
-  tabButtonTextActive: {
-    color: '#07090e',
+  segmentTextActive: {
+    color: '#f4f4f5',
   },
 
   // Terminal Viewport
   terminalViewport: {
     flex: 1,
-    backgroundColor: '#07090e',
+    backgroundColor: '#0a0b0d',
     paddingHorizontal: 10,
   },
   terminalContent: {
@@ -782,299 +784,312 @@ const styles = StyleSheet.create({
   terminalText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 12,
-    lineHeight: 17,
-    color: '#e2e8f0',
+    lineHeight: 18,
+    color: '#e4e4e7',
   },
 
-  // Floating Control Bar
-  controlBar: {
-    backgroundColor: '#0d1117',
+  // Keycap Ribbon
+  keycapRibbon: {
+    backgroundColor: '#101116',
     borderTopWidth: 1,
-    borderTopColor: '#1e293b',
+    borderTopColor: '#1e2028',
     paddingVertical: 6,
   },
-  controlScroll: {
+  ribbonScroll: {
     paddingHorizontal: 8,
     gap: 6,
     flexDirection: 'row',
     alignItems: 'center',
   },
-  keyButton: {
-    backgroundColor: '#161b22',
+  keycap: {
+    backgroundColor: '#161820',
     paddingHorizontal: 10,
     paddingVertical: 7,
-    borderRadius: 6,
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#30363d',
+    borderColor: '#262936',
     minWidth: 38,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  keyButtonText: {
+  keycapText: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#d4d4d8',
+  },
+  keycapCtrlC: {
+    backgroundColor: '#231518',
+    borderColor: '#3e1d23',
+  },
+  keycapCtrlCText: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#f87171',
+  },
+  keycapCtrlD: {
+    backgroundColor: '#261c14',
+    borderColor: '#422c1d',
+  },
+  keycapCtrlDText: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#fbbf24',
+  },
+  keycapEnter: {
+    backgroundColor: '#16221c',
+    borderColor: '#243c2f',
+  },
+  keycapEnterText: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#4ade80',
+  },
+  keycapTool: {
+    backgroundColor: '#1c1e28',
+    borderColor: '#2c3042',
+  },
+  keycapToolText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 11,
     fontWeight: '700',
     color: '#cbd5e1',
   },
-  arrowKeyText: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#38bdf8',
-  },
-  dangerKey: {
-    backgroundColor: '#3b1219',
-    borderColor: '#f43f5e',
-  },
-  dangerKeyText: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#f43f5e',
-  },
-  specialKey: {
-    backgroundColor: '#1e293b',
-    borderColor: '#64748b',
-  },
-  specialKeyText: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#94a3b8',
-  },
-  enterKey: {
-    backgroundColor: '#064e3b',
-    borderColor: '#10b981',
-  },
-  enterKeyText: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#34d399',
-  },
-  toolKey: {
-    backgroundColor: '#2e1065',
-    borderColor: '#a855f7',
-  },
-  toolKeyText: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 11,
-    fontWeight: '800',
-    color: '#c084fc',
-  },
-  autoScrollActive: {
-    borderColor: '#00ff9d',
+  keycapAutoScroll: {
+    borderColor: '#3b82f6',
   },
 
   // Input Bar
-  inputContainer: {
+  inputBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0d1117',
+    backgroundColor: '#101116',
     paddingHorizontal: 10,
     paddingVertical: 8,
     borderTopWidth: 1,
-    borderTopColor: '#1e293b',
+    borderTopColor: '#1e2028',
     gap: 8,
   },
-  promptSymbol: {
+  promptChar: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 16,
-    fontWeight: '900',
-    color: '#00ff9d',
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#71717a',
   },
-  textInput: {
+  inputField: {
     flex: 1,
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 13,
-    color: '#f8fafc',
-    backgroundColor: '#161b22',
+    color: '#f4f4f5',
+    backgroundColor: '#161820',
     paddingHorizontal: 10,
     paddingVertical: 8,
-    borderRadius: 6,
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: '#30363d',
+    borderColor: '#262936',
   },
-  sendButton: {
+  sendBtn: {
     paddingHorizontal: 14,
     paddingVertical: 9,
-    borderRadius: 6,
+    borderRadius: 4,
   },
-  sendButtonActive: {
-    backgroundColor: '#00ff9d',
+  sendBtnActive: {
+    backgroundColor: '#f4f4f5',
   },
-  sendButtonDisabled: {
-    backgroundColor: '#1e293b',
+  sendBtnDisabled: {
+    backgroundColor: '#20222a',
   },
-  sendButtonText: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#07090e',
-  },
-
-  // Power Center Styles
-  powerContainer: {
-    flex: 1,
-    backgroundColor: '#07090e',
-  },
-  powerContent: {
-    padding: 14,
-    paddingBottom: 40,
-  },
-  sectionHeading: {
+  sendBtnText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 11,
     fontWeight: '800',
-    color: '#64748b',
-    letterSpacing: 1.5,
-    marginTop: 14,
-    marginBottom: 10,
+    color: '#0a0b0d',
   },
-  hudRow: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  hudCard: {
+
+  // Power View
+  powerView: {
     flex: 1,
-    backgroundColor: '#0d1117',
-    padding: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#1e293b',
+    backgroundColor: '#0a0b0d',
   },
-  hudLabel: {
+  powerViewContent: {
+    padding: 14,
+    paddingBottom: 40,
+  },
+  hudContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#12141a',
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#1e212b',
+    padding: 12,
+    marginBottom: 16,
+  },
+  hudCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  hudDivider: {
+    width: 1,
+    backgroundColor: '#1e212b',
+    marginHorizontal: 8,
+  },
+  hudTitle: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 9,
     fontWeight: '700',
-    color: '#94a3b8',
+    color: '#71717a',
+    marginBottom: 3,
   },
-  hudValue: {
+  hudStat: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '800',
-    color: '#00ff9d',
-    marginVertical: 2,
+    color: '#f4f4f5',
+    marginBottom: 2,
   },
   hudSub: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 9,
-    color: '#64748b',
+    color: '#a1a1aa',
   },
-  bigActionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 10,
-    gap: 12,
-  },
-  actionIconLarge: {
-    fontSize: 22,
-  },
-  actionTextCol: {
-    flex: 1,
-  },
-  actionTitleLarge: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 13,
-    fontWeight: '800',
-    color: '#f8fafc',
-    marginBottom: 2,
-  },
-  actionDescLarge: {
+  groupHeading: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 10,
-    color: '#94a3b8',
+    fontWeight: '700',
+    color: '#71717a',
+    letterSpacing: 1.2,
+    marginBottom: 8,
+    marginTop: 6,
   },
-  shutdownButton: {
-    backgroundColor: '#3b1219',
-    borderColor: '#f43f5e',
-  },
-  rebootButton: {
-    backgroundColor: '#2d1a08',
-    borderColor: '#f59e0b',
-  },
-  suspendButton: {
-    backgroundColor: '#0c2238',
-    borderColor: '#38bdf8',
-  },
-  stealthActiveButton: {
-    backgroundColor: '#064e3b',
-    borderColor: '#10b981',
-  },
-  stealthInactiveButton: {
-    backgroundColor: '#0d1117',
-    borderColor: '#1e293b',
-  },
-  wolButton: {
-    backgroundColor: '#161b22',
-    borderColor: '#38bdf8',
-  },
-  lockButton: {
-    backgroundColor: '#161b22',
-    borderColor: '#30363d',
-  },
-
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.85)',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  modalCard: {
-    backgroundColor: '#0d1117',
-    borderRadius: 12,
-    padding: 20,
+  powerCard: {
+    backgroundColor: '#12141a',
+    borderRadius: 6,
     borderWidth: 1,
-    borderColor: '#30363d',
-  },
-  modalTitle: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#f8fafc',
+    borderColor: '#1e212b',
+    padding: 12,
     marginBottom: 8,
   },
-  modalDescription: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 12,
-    color: '#94a3b8',
-    lineHeight: 18,
-    marginBottom: 20,
+  powerCardDanger: {
+    backgroundColor: '#181214',
+    borderColor: '#351c21',
   },
-  modalButtonRow: {
+  powerCardWarning: {
+    backgroundColor: '#181611',
+    borderColor: '#362a19',
+  },
+  powerCardActive: {
+    backgroundColor: '#111814',
+    borderColor: '#1e3828',
+  },
+  cardHeader: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
-  dialogButton: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 6,
-  },
-  dialogCancel: {
-    backgroundColor: '#1e293b',
-  },
-  dialogCancelText: {
+  cardLabel: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 12,
     fontWeight: '700',
-    color: '#94a3b8',
+    color: '#f4f4f5',
   },
-  dialogConfirm: {
-    backgroundColor: '#38bdf8',
-  },
-  dialogDanger: {
-    backgroundColor: '#f43f5e',
-  },
-  dialogConfirmText: {
+  cardLabelDanger: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 12,
-    fontWeight: '800',
-    color: '#07090e',
+    fontWeight: '700',
+    color: '#f87171',
   },
-  textRed: { color: '#f43f5e' },
+  cardLabelWarning: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#fbbf24',
+  },
+  cardLabelActive: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#4ade80',
+  },
+  cmdBadge: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 9,
+    color: '#71717a',
+    backgroundColor: '#0a0b0d',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 3,
+  },
+  cardDesc: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 10,
+    color: '#a1a1aa',
+  },
+
+  // Modal
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.75)',
+    justifyContent: 'center',
+    padding: 24,
+  },
+  dialogCard: {
+    backgroundColor: '#12141a',
+    borderRadius: 8,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: '#262936',
+  },
+  dialogTitle: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 15,
+    fontWeight: '800',
+    color: '#f4f4f5',
+    marginBottom: 6,
+  },
+  dialogMessage: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 11,
+    color: '#a1a1aa',
+    lineHeight: 16,
+    marginBottom: 18,
+  },
+  dialogActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  dialogBtnSecondary: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 4,
+    backgroundColor: '#1a1c24',
+    borderWidth: 1,
+    borderColor: '#282a36',
+  },
+  dialogBtnSecondaryText: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#a1a1aa',
+  },
+  dialogBtnPrimary: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 4,
+    backgroundColor: '#f4f4f5',
+  },
+  dialogBtnDanger: {
+    backgroundColor: '#ef4444',
+  },
+  dialogBtnPrimaryText: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#0a0b0d',
+  },
+  textRed: { color: '#ef4444' },
 });
