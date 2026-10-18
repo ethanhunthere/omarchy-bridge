@@ -12,6 +12,7 @@ import {
   Platform,
   Modal,
   Dimensions,
+  Keyboard,
 } from 'react-native';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
@@ -213,6 +214,7 @@ export default function App() {
   const [terminalText, setTerminalText] = useState<string>('');
   const [inputCommand, setInputCommand] = useState('');
   const [isInputFocused, setIsInputFocused] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -381,7 +383,7 @@ export default function App() {
         socketRef.current.send(JSON.stringify({ type: 'signal', signal: 'enter' }));
       } else {
         socketRef.current.send(JSON.stringify({ type: 'input', data: cmd }));
-        setHistory((prev) => [cmd, ...prev.filter((h) => h !== cmd).slice(0, 40)]);
+        setHistory((prev) => [cmd, ...prev.filter((h) => h !== cmd)].slice(0, 40));
         setHistoryIndex(-1);
         setInputCommand('');
       }
@@ -546,7 +548,12 @@ export default function App() {
 
             {/* Keycap Ribbon (pinned above keyboard) */}
             <View style={styles.keycapRibbon}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.ribbonScroll}>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.ribbonScroll}
+                keyboardShouldPersistTaps="handled"
+              >
                 <TouchableOpacity style={[styles.keycap, styles.keycapCtrlC]} onPress={() => sendSignal('ctrl_c')}>
                   <Text style={styles.keycapCtrlCText}>Ctrl+C</Text>
                 </TouchableOpacity>
@@ -606,7 +613,7 @@ export default function App() {
               <Text style={[styles.promptChar, isInputFocused && styles.promptCharFocused]}>❯</Text>
               <TextInput
                 ref={inputRef}
-                style={styles.inputField}
+                style={[styles.inputField, isInputFocused && styles.inputFieldFocused]}
                 value={inputCommand}
                 onChangeText={setInputCommand}
                 onFocus={() => {
@@ -685,7 +692,7 @@ export default function App() {
             style={[styles.powerCard, styles.powerCardDanger]}
             onPress={() =>
               promptConfirmation(
-                'Shut Down Machine',
+                'Shut Down PC?',
                 'This will execute "systemctl poweroff" and cleanly power off the PC.',
                 'poweroff',
                 true
@@ -908,6 +915,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
   },
   terminalContent: {
+    flexGrow: 1,
     paddingTop: 8,
     paddingBottom: 24,
   },
@@ -1100,6 +1108,9 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     borderWidth: 1,
     borderColor: '#262936',
+  },
+  inputFieldFocused: {
+    borderColor: '#3b82f6',
   },
   clearInputBtn: {
     paddingHorizontal: 6,
