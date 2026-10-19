@@ -21,7 +21,7 @@ const testTracks = [
   { id: 'Agent 9', name: 'History Navigation ▲/▼ & Deduplication', cmd: 'node server/test-history-navigation.js' },
   { id: 'Agent 10', name: 'One-Tap agy Quick Launcher & Screen Rendering', cmd: 'node server/test-agent10-agy.js' },
   { id: 'Agent 11', name: 'Terminal Clear Button', cmd: 'node server/test-clear-functionality.js' },
-  { id: 'Agent 12', name: 'AUTO-SCROLL Mode Toggle & Smooth Anchoring', cmd: 'bun test mobile/__tests__/tab-switcher.test.tsx' },
+  { id: 'Agent 12', name: 'AUTO-SCROLL Mode Toggle & Smooth Anchoring', cmd: 'node mobile/test-agent12-autoscroll.js' },
   { id: 'Agent 13', name: 'Viewport Dynamic Resize Sync & Orientation', cmd: 'node server/test-viewport-resize.js' },
   { id: 'Agent 14', name: 'Shut Down Button & Safety Confirmation Modal', cmd: 'node server/test-shutdown-modal.js' },
   { id: 'Agent 15', name: 'Reboot Button & Safety Confirmation Modal', cmd: 'node mobile/test-agent15-reboot-modal.js' },

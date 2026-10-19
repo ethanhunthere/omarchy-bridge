@@ -240,7 +240,7 @@ async function auditZeroPasswordPromptHangs() {
   } finally {
     // Clean up any lock screen spawned during unit testing
     try {
-      execSync('killall hyprlock 2>/dev/null || true');
+      execSync('killall -TERM hyprlock 2>/dev/null || true; sleep 0.2; pkill -9 -f hyprlock 2>/dev/null || true');
     } catch (e) {}
   }
 }
@@ -344,7 +344,7 @@ async function testLiveBridgeEndpoints() {
 
   // Clean up any hyprlock process that might have been spawned by tests
   try {
-    execSync('killall -TERM hyprlock 2>/dev/null || true');
+    execSync('killall -TERM hyprlock 2>/dev/null || true; sleep 0.2; pkill -9 -f hyprlock 2>/dev/null || true');
   } catch (e) {}
 }
 

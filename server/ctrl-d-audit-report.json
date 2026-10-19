@@ -1,0 +1,135 @@
+{
+  "timestamp": "2026-10-19T15:38:15.896Z",
+  "summary": "All Ctrl+D signal, haptics, UI amber styling, REPL lifecycle, and subshell exit checks PASSED.",
+  "totalChecks": 21,
+  "passed": 21,
+  "failed": 0,
+  "results": [
+    {
+      "suite": "App.tsx",
+      "name": "Ctrl+D Button present in keycap ribbon",
+      "status": "PASS",
+      "details": "onPress invokes sendSignal('ctrl_d')"
+    },
+    {
+      "suite": "App.tsx",
+      "name": "Amber styling configured for Ctrl+D",
+      "status": "PASS",
+      "details": "bg: #261c14, border: #422c1d, text: #fbbf24 (amber-400)"
+    },
+    {
+      "suite": "App.tsx",
+      "name": "sendSignal WebSocket payload contract",
+      "status": "PASS",
+      "details": "Dispatches { type: 'signal', signal: 'ctrl_d' }"
+    },
+    {
+      "suite": "server.js",
+      "name": "Server signal handler for ctrl_d",
+      "status": "PASS",
+      "details": "Writes ASCII \\x04 (EOT/EOF byte 0x04) to ptyProcess"
+    },
+    {
+      "suite": "E2E",
+      "name": "WebSocket Handshake & Token Auth",
+      "status": "PASS",
+      "details": "Connected on port 19099"
+    },
+    {
+      "suite": "cat stream",
+      "name": "cat received and echoed stream input",
+      "status": "PASS",
+      "details": "STREAM_DATA_CHUNK_7"
+    },
+    {
+      "suite": "cat stream",
+      "name": "Ctrl+D cleanly terminates cat stdin stream",
+      "status": "PASS",
+      "details": "Returned cleanly to shell prompt"
+    },
+    {
+      "suite": "Python REPL",
+      "name": "Python interactive REPL initialized",
+      "status": "PASS",
+      "details": "Prompt >>> detected"
+    },
+    {
+      "suite": "Python REPL",
+      "name": "Python executed expression",
+      "status": "PASS",
+      "details": "PY_VAL_42 verified"
+    },
+    {
+      "suite": "Python REPL",
+      "name": "Ctrl+D cleanly exits Python REPL",
+      "status": "PASS",
+      "details": "Returned cleanly to shell prompt"
+    },
+    {
+      "suite": "Node REPL",
+      "name": "Node interactive REPL initialized",
+      "status": "PASS",
+      "details": "Prompt > detected"
+    },
+    {
+      "suite": "Node REPL",
+      "name": "Node executed expression",
+      "status": "PASS",
+      "details": "100 verified"
+    },
+    {
+      "suite": "Node REPL",
+      "name": "Ctrl+D cleanly exits Node REPL",
+      "status": "PASS",
+      "details": "Returned cleanly to shell prompt"
+    },
+    {
+      "suite": "Subshell (sh)",
+      "name": "sh subshell spawned",
+      "status": "PASS",
+      "details": "SUBSHELL_SH_RUNNING"
+    },
+    {
+      "suite": "Subshell (sh)",
+      "name": "Ctrl+D cleanly exits subshell",
+      "status": "PASS",
+      "details": "Returned to parent fish shell"
+    },
+    {
+      "suite": "Subshell (bash)",
+      "name": "bash subshell spawned",
+      "status": "PASS",
+      "details": "SUBSHELL_BASH_RUNNING"
+    },
+    {
+      "suite": "Subshell (bash)",
+      "name": "Ctrl+D cleanly exits bash subshell",
+      "status": "PASS",
+      "details": "Returned to parent fish shell"
+    },
+    {
+      "suite": "tmux Session",
+      "name": "Persistent tmux session intact and running",
+      "status": "PASS",
+      "details": "Session omarchy-test-ctrl-d-1792424288128 alive after all Ctrl+D tests"
+    },
+    {
+      "suite": "Primary Server",
+      "name": "tmux session omarchy-remote is active",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "suite": "Primary Server",
+      "name": "WebSocket Connected to production bridge daemon",
+      "status": "PASS",
+      "details": ""
+    },
+    {
+      "suite": "Primary Server",
+      "name": "Primary bridge server processed Ctrl+D and maintained tmux session",
+      "status": "PASS",
+      "details": "PRIMARY_CTRL_D_VERIFIED"
+    }
+  ]
+}

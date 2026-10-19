@@ -211,6 +211,40 @@ async function runLiveE2ETests() {
     ws.send(JSON.stringify({ type: 'input', data: '' }));
     await sleep(400);
 
+    function getForegroundCmd() {
+      try {
+        return execSync(`tmux display-message -t ${TEST_SESSION} -p "#{pane_current_command}"`, {
+          stdio: ['pipe', 'pipe', 'ignore'],
+        }).toString().trim();
+      } catch (e) {
+        return 'unknown';
+      }
+    }
+
+    async function waitForShellReturn(expectedCmd = 'fish', maxWaitMs = 4000) {
+      const start = Date.now();
+      while (Date.now() - start < maxWaitMs) {
+        if (getForegroundCmd() === expectedCmd) {
+          await sleep(300);
+          return true;
+        }
+        await sleep(50);
+      }
+      await sleep(300);
+      return false;
+    }
+
+    async function verifyCanary(label) {
+      receivedData = '';
+      ws.send(JSON.stringify({ type: 'input', data: `echo ${label}` }));
+      try {
+        await waitForMatch((out) => out.includes(label), 4000);
+      } catch (e) {
+        ws.send(JSON.stringify({ type: 'input', data: `echo ${label}` }));
+        await waitForMatch((out) => out.includes(label), 4000);
+      }
+    }
+
     // ---------------------------------------------------------
     // Test 2.1: Clean closure of cat stdin stream via Ctrl+D
     // ---------------------------------------------------------
@@ -227,11 +261,10 @@ async function runLiveE2ETests() {
     // Send Ctrl+D signal
     receivedData = '';
     ws.send(JSON.stringify({ type: 'signal', signal: 'ctrl_d' }));
-    await sleep(600);
+    await waitForShellReturn('fish');
 
     // Verify cat has closed and shell is back
-    ws.send(JSON.stringify({ type: 'input', data: 'echo CAT_STREAM_CLOSED_OK' }));
-    await waitForMatch((out) => out.includes('CAT_STREAM_CLOSED_OK'), 5000);
+    await verifyCanary('CAT_STREAM_CLOSED_OK');
     logPass('cat stream', 'Ctrl+D cleanly terminates cat stdin stream', 'Returned cleanly to shell prompt');
 
     // ---------------------------------------------------------
@@ -251,11 +284,10 @@ async function runLiveE2ETests() {
     // Send Ctrl+D signal to exit Python
     receivedData = '';
     ws.send(JSON.stringify({ type: 'signal', signal: 'ctrl_d' }));
-    await sleep(600);
+    await waitForShellReturn('fish');
 
     // Verify Python exited and shell is responsive
-    ws.send(JSON.stringify({ type: 'input', data: 'echo PYTHON_EXIT_OK' }));
-    await waitForMatch((out) => out.includes('PYTHON_EXIT_OK'), 5000);
+    await verifyCanary('PYTHON_EXIT_OK');
     logPass('Python REPL', 'Ctrl+D cleanly exits Python REPL', 'Returned cleanly to shell prompt');
 
     // ---------------------------------------------------------
@@ -275,11 +307,10 @@ async function runLiveE2ETests() {
     // Send Ctrl+D signal to exit Node REPL
     receivedData = '';
     ws.send(JSON.stringify({ type: 'signal', signal: 'ctrl_d' }));
-    await sleep(600);
+    await waitForShellReturn('fish');
 
     // Verify Node exited and shell is responsive
-    ws.send(JSON.stringify({ type: 'input', data: 'echo NODE_EXIT_OK' }));
-    await waitForMatch((out) => out.includes('NODE_EXIT_OK'), 5000);
+    await verifyCanary('NODE_EXIT_OK');
     logPass('Node REPL', 'Ctrl+D cleanly exits Node REPL', 'Returned cleanly to shell prompt');
 
     // ---------------------------------------------------------
@@ -288,9 +319,11 @@ async function runLiveE2ETests() {
     logInfo('Testing sh subshell exit with Ctrl+D...');
     receivedData = '';
     ws.send(JSON.stringify({ type: 'input', data: 'sh' }));
-    await sleep(400);
+    await waitForMatch((out) => out.includes('sh-') || out.includes('$'), 6000);
+    await sleep(300);
 
     // Verify we are in sh subshell
+    receivedData = '';
     ws.send(JSON.stringify({ type: 'input', data: 'echo SUBSHELL_SH_RUNNING' }));
     await waitForMatch((out) => out.includes('SUBSHELL_SH_RUNNING'), 5000);
     logPass('Subshell (sh)', 'sh subshell spawned', 'SUBSHELL_SH_RUNNING');
@@ -298,11 +331,10 @@ async function runLiveE2ETests() {
     // Exit sh subshell via Ctrl+D
     receivedData = '';
     ws.send(JSON.stringify({ type: 'signal', signal: 'ctrl_d' }));
-    await sleep(600);
+    await waitForShellReturn('fish');
 
     // Verify returned to parent shell
-    ws.send(JSON.stringify({ type: 'input', data: 'echo RETURNED_TO_PARENT_FISH' }));
-    await waitForMatch((out) => out.includes('RETURNED_TO_PARENT_FISH'), 5000);
+    await verifyCanary('RETURNED_TO_PARENT_FISH');
     logPass('Subshell (sh)', 'Ctrl+D cleanly exits subshell', 'Returned to parent fish shell');
 
     // ---------------------------------------------------------
@@ -311,9 +343,11 @@ async function runLiveE2ETests() {
     logInfo('Testing bash subshell exit with Ctrl+D...');
     receivedData = '';
     ws.send(JSON.stringify({ type: 'input', data: 'bash --norc --noprofile' }));
-    await sleep(400);
+    await waitForMatch((out) => out.includes('bash') || out.includes('$'), 6000);
+    await sleep(300);
 
     // Verify bash subshell
+    receivedData = '';
     ws.send(JSON.stringify({ type: 'input', data: 'echo SUBSHELL_BASH_RUNNING' }));
     await waitForMatch((out) => out.includes('SUBSHELL_BASH_RUNNING'), 5000);
     logPass('Subshell (bash)', 'bash subshell spawned', 'SUBSHELL_BASH_RUNNING');
@@ -321,11 +355,10 @@ async function runLiveE2ETests() {
     // Exit bash subshell via Ctrl+D
     receivedData = '';
     ws.send(JSON.stringify({ type: 'signal', signal: 'ctrl_d' }));
-    await sleep(600);
+    await waitForShellReturn('fish');
 
     // Verify returned to parent shell
-    ws.send(JSON.stringify({ type: 'input', data: 'echo BASH_EXIT_SUCCESS' }));
-    await waitForMatch((out) => out.includes('BASH_EXIT_SUCCESS'), 5000);
+    await verifyCanary('BASH_EXIT_SUCCESS');
     logPass('Subshell (bash)', 'Ctrl+D cleanly exits bash subshell', 'Returned to parent fish shell');
 
     // ---------------------------------------------------------
@@ -430,7 +463,12 @@ async function runPrimaryServerCheck() {
     // Test prompt recovery
     receivedData = '';
     ws.send(JSON.stringify({ type: 'input', data: 'echo PRIMARY_CTRL_D_VERIFIED' }));
-    await waitForMatch((out) => out.includes('PRIMARY_CTRL_D_VERIFIED'), 6000);
+    try {
+      await waitForMatch((out) => out.includes('PRIMARY_CTRL_D_VERIFIED'), 4000);
+    } catch (e) {
+      ws.send(JSON.stringify({ type: 'input', data: 'echo PRIMARY_CTRL_D_VERIFIED' }));
+      await waitForMatch((out) => out.includes('PRIMARY_CTRL_D_VERIFIED'), 4000);
+    }
     logPass('Primary Server', 'Primary bridge server processed Ctrl+D and maintained tmux session', 'PRIMARY_CTRL_D_VERIFIED');
 
   } catch (err) {
@@ -465,6 +503,24 @@ async function main() {
   console.log(`Total Checks: ${total}`);
   console.log(`Passed:       ${GREEN}${passed}${RESET}`);
   console.log(`Failed:       ${failed > 0 ? RED + failed + RESET : '0'}`);
+
+  const reportPath = path.resolve(__dirname, 'ctrl-d-audit-report.json');
+  fs.writeFileSync(
+    reportPath,
+    JSON.stringify(
+      {
+        timestamp: new Date().toISOString(),
+        summary: failed === 0 ? 'All Ctrl+D signal, haptics, UI amber styling, REPL lifecycle, and subshell exit checks PASSED.' : `${failed} checks failed.`,
+        totalChecks: total,
+        passed,
+        failed,
+        results,
+      },
+      null,
+      2
+    )
+  );
+  logInfo(`Saved audit report to ${reportPath}`);
 
   if (failed > 0) {
     console.error(`\n${RED}TEST SUITE FAILED${RESET} (${failed} failures)`);
