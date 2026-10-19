@@ -336,9 +336,10 @@ export default function App() {
         setStatus('connected');
         triggerHaptic('light');
 
-        const { width } = Dimensions.get('window');
+        const { width, height } = Dimensions.get('window');
         const calculatedCols = Math.max(45, Math.floor((width - 24) / 7.2));
-        ws.send(JSON.stringify({ type: 'resize', cols: calculatedCols, rows: 35 }));
+        const calculatedRows = Math.max(20, Math.floor((height - 200) / 19));
+        ws.send(JSON.stringify({ type: 'resize', cols: calculatedCols, rows: calculatedRows }));
 
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
         pingIntervalRef.current = setInterval(() => {
