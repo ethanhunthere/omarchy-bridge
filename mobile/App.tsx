@@ -496,14 +496,6 @@ export default function App() {
       {/* Clean Industrial Header Bar (No AI glow, no cyberpunk) */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <View
-            style={[
-              styles.statusDot,
-              status === 'connected' && styles.statusConnected,
-              status === 'connecting' && styles.statusConnecting,
-              status === 'disconnected' && styles.statusDisconnected,
-            ]}
-          />
           <Text style={styles.headerTitle}>omarchy-remote</Text>
           {latency !== null && (
             <View style={styles.latencyPill}>
@@ -936,20 +928,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-  },
-  statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  statusConnected: {
-    backgroundColor: '#22c55e',
-  },
-  statusConnecting: {
-    backgroundColor: '#f59e0b',
-  },
-  statusDisconnected: {
-    backgroundColor: '#ef4444',
   },
   headerTitle: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
