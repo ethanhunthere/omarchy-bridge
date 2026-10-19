@@ -227,6 +227,7 @@ export default function App() {
     battery?: { level: number; status: string; ac: boolean };
     netSpeed?: { rxKbps: number; txKbps: number };
     stealthMode?: boolean;
+    dpmsOn?: boolean;
     uptimeSeconds?: number;
   } | null>(null);
 
@@ -255,6 +256,38 @@ export default function App() {
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hostIndexRef = useRef(0);
   const isMountedRef = useRef(true);
+
+  // Track keyboard visibility and handle background touch to dismiss keyboard
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvent, () => setIsKeyboardVisible(true));
+    const hideSub = Keyboard.addListener(hideEvent, () => setIsKeyboardVisible(false));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
+
+  // Sync terminal dimensions dynamically on screen rotation / size changes
+  useEffect(() => {
+    const subscription = Dimensions.addEventListener('change', ({ window }) => {
+      if (socketRef.current?.readyState === WebSocket.OPEN) {
+        const calculatedCols = Math.max(45, Math.floor((window.width - 24) / 7.2));
+        const calculatedRows = Math.max(20, Math.floor((window.height - 200) / 19));
+        socketRef.current.send(JSON.stringify({ type: 'resize', cols: calculatedCols, rows: calculatedRows }));
+      }
+    });
+    return () => subscription?.remove();
+  }, []);
+
+  const handleTerminalPress = useCallback(() => {
+    if (isKeyboardVisible || isInputFocused) {
+      Keyboard.dismiss();
+    } else {
+      inputRef.current?.focus();
+    }
+  }, [isKeyboardVisible, isInputFocused]);
 
   const triggerHaptic = (type: 'light' | 'medium' | 'warning' = 'light') => {
     try {
@@ -329,11 +362,23 @@ export default function App() {
             appendOutputChunk(msg.data);
           } else if (msg.type === 'telemetry') {
             setTelemetry(msg.data);
+          } else if (msg.type === 'action_result') {
+            if (msg.result && typeof msg.result.dpmsOn === 'boolean') {
+              setTelemetry((prev) => ({ ...(prev || {}), dpmsOn: msg.result.dpmsOn }));
+            }
+            if (msg.result && typeof msg.result.stealthMode === 'boolean') {
+              setTelemetry((prev) => ({ ...(prev || {}), stealthMode: msg.result.stealthMode }));
+            }
           } else if (msg.type === 'status' && msg.message) {
             appendOutputChunk(msg.message);
           } else if (msg.type === 'pong' && msg.clientTime) {
             setLatency(Date.now() - msg.clientTime);
           } else if (msg.type === 'cleared') {
+            incomingBufferRef.current = '';
+            if (flushTimeoutRef.current) {
+              clearTimeout(flushTimeoutRef.current);
+              flushTimeoutRef.current = null;
+            }
             setScreenLines([]);
             setTerminalText('');
           }
@@ -408,6 +453,11 @@ export default function App() {
 
   const clearScreen = () => {
     triggerHaptic('light');
+    incomingBufferRef.current = '';
+    if (flushTimeoutRef.current) {
+      clearTimeout(flushTimeoutRef.current);
+      flushTimeoutRef.current = null;
+    }
     setScreenLines([]);
     setTerminalText('');
     if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
@@ -505,6 +555,7 @@ export default function App() {
               style={styles.terminalViewport}
               contentContainerStyle={styles.terminalContent}
               keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="on-drag"
               onContentSizeChange={() => {
                 if (autoScroll) {
                   scrollViewRef.current?.scrollToEnd({ animated: false });
@@ -513,7 +564,7 @@ export default function App() {
             >
               <TouchableOpacity
                 activeOpacity={1}
-                onPress={() => inputRef.current?.focus()}
+                onPress={handleTerminalPress}
                 style={styles.touchableTerminal}
               >
                 {screenLines.length === 0 && !terminalText ? (
@@ -652,7 +703,12 @@ export default function App() {
       {/* VIEW 2: MACHINE POWER & HARDWARE                     */}
       {/* ==================================================== */}
       {activeTab === 'power' && (
-        <ScrollView style={styles.powerView} contentContainerStyle={styles.powerViewContent}>
+        <ScrollView
+          style={styles.powerView}
+          contentContainerStyle={styles.powerViewContent}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
           {/* Status HUD Header */}
           <View style={styles.hudContainer}>
             <View style={styles.hudCol}>
@@ -709,9 +765,11 @@ export default function App() {
           {/* Reboot */}
           <TouchableOpacity
             style={[styles.powerCard, styles.powerCardWarning]}
+            testID="reboot-btn"
+            accessibilityLabel="REBOOT"
             onPress={() =>
               promptConfirmation(
-                'Reboot Machine',
+                'Reboot PC?',
                 'This will execute "systemctl reboot" and restart the PC. Bridge will auto-reconnect on boot.',
                 'reboot',
                 true
@@ -719,7 +777,7 @@ export default function App() {
             }
           >
             <View style={styles.cardHeader}>
-              <Text style={styles.cardLabelWarning}>REBOOT SYSTEM</Text>
+              <Text style={styles.cardLabelWarning}>REBOOT PC</Text>
               <Text style={styles.cmdBadge}>systemctl reboot</Text>
             </View>
             <Text style={styles.cardDesc}>Clean system restart</Text>
@@ -728,9 +786,11 @@ export default function App() {
           {/* Suspend */}
           <TouchableOpacity
             style={styles.powerCard}
+            testID="suspend-btn"
+            accessibilityLabel="SUSPEND"
             onPress={() =>
               promptConfirmation(
-                'Suspend Machine',
+                'Suspend PC?',
                 'This will execute "systemctl suspend" to put the PC into low-power RAM sleep.',
                 'suspend',
                 false
@@ -738,7 +798,7 @@ export default function App() {
             }
           >
             <View style={styles.cardHeader}>
-              <Text style={styles.cardLabel}>SLEEP / SUSPEND</Text>
+              <Text style={styles.cardLabel}>SUSPEND</Text>
               <Text style={styles.cmdBadge}>systemctl suspend</Text>
             </View>
             <Text style={styles.cardDesc}>Low-power memory standby</Text>
@@ -753,9 +813,11 @@ export default function App() {
           >
             <View style={styles.cardHeader}>
               <Text style={telemetry?.stealthMode ? styles.cardLabelActive : styles.cardLabel}>
-                {telemetry?.stealthMode ? 'STEALTH MODE: ACTIVE' : 'STEALTH SCREEN OFF'}
+                {telemetry?.stealthMode ? 'STEALTH MODE: ACTIVE' : 'STEALTH MODE'}
               </Text>
-              <Text style={styles.cmdBadge}>hyprctl dpms off</Text>
+              <Text style={styles.cmdBadge}>
+                {telemetry?.stealthMode ? 'hyprctl dpms on' : 'hyprctl dpms off'}
+              </Text>
             </View>
             <Text style={styles.cardDesc}>
               {telemetry?.stealthMode
@@ -764,8 +826,35 @@ export default function App() {
             </Text>
           </TouchableOpacity>
 
+          {/* Physical Monitor DPMS Toggle */}
+          <TouchableOpacity
+            testID="monitor-dpms-toggle"
+            accessibilityLabel="MONITOR (DPMS)"
+            style={[styles.powerCard, telemetry?.dpmsOn === false ? styles.powerCardActive : {}]}
+            onPress={() => dispatchAction('dpms_toggle')}
+          >
+            <View style={styles.cardHeader}>
+              <Text style={telemetry?.dpmsOn === false ? styles.cardLabelActive : styles.cardLabel}>
+                MONITOR (DPMS)
+              </Text>
+              <Text style={styles.cmdBadge}>
+                {telemetry?.dpmsOn === false ? 'hyprctl dpms off' : 'hyprctl dpms on'}
+              </Text>
+            </View>
+            <Text style={styles.cardDesc}>
+              {telemetry?.dpmsOn === false
+                ? 'Physical screen is powered off (DPMS). Tap to restore display.'
+                : 'Toggle physical monitor power on/off independently of stealth sleep inhibit.'}
+            </Text>
+          </TouchableOpacity>
+
           {/* Wake-on-LAN */}
-          <TouchableOpacity style={styles.powerCard} onPress={() => dispatchAction('send_wol')}>
+          <TouchableOpacity
+            testID="wake-on-lan-btn"
+            accessibilityLabel="SEND WAKE-ON-LAN"
+            style={styles.powerCard}
+            onPress={() => dispatchAction('send_wol')}
+          >
             <View style={styles.cardHeader}>
               <Text style={styles.cardLabel}>SEND WAKE-ON-LAN</Text>
               <Text style={styles.cmdBadge}>UDP magic packet</Text>
@@ -776,26 +865,27 @@ export default function App() {
           {/* Lock Screen */}
           <TouchableOpacity style={styles.powerCard} onPress={() => dispatchAction('lock')}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardLabel}>LOCK DESKTOP</Text>
-              <Text style={styles.cmdBadge}>hyprlock</Text>
+              <Text style={styles.cardLabel}>LOCK SCREEN</Text>
+              <Text style={styles.cmdBadge}>omarchy-system-lock</Text>
             </View>
-            <Text style={styles.cardDesc}>Locks active Wayland graphical session</Text>
+            <Text style={styles.cardDesc}>Locks desktop session & secures 1Password</Text>
           </TouchableOpacity>
         </ScrollView>
       )}
 
       {/* Industrial Minimal Confirmation Dialog */}
-      <Modal visible={confirmModal.visible} transparent animationType="fade">
+      <Modal visible={confirmModal.visible} transparent animationType="fade" testID="confirmation-modal">
         <View style={styles.modalBackdrop}>
           <View style={styles.dialogCard}>
-            <Text style={[styles.dialogTitle, confirmModal.isDanger && styles.textRed]}>
+            <Text style={[styles.dialogTitle, confirmModal.isDanger && styles.textRed]} testID="modal-title">
               {confirmModal.title}
             </Text>
-            <Text style={styles.dialogMessage}>{confirmModal.description}</Text>
+            <Text style={styles.dialogMessage} testID="modal-description">{confirmModal.description}</Text>
 
             <View style={styles.dialogActions}>
               <TouchableOpacity
                 style={styles.dialogBtnSecondary}
+                testID="modal-cancel-btn"
                 onPress={() => setConfirmModal((p) => ({ ...p, visible: false }))}
               >
                 <Text style={styles.dialogBtnSecondaryText}>Cancel</Text>
@@ -803,6 +893,7 @@ export default function App() {
 
               <TouchableOpacity
                 style={[styles.dialogBtnPrimary, confirmModal.isDanger ? styles.dialogBtnDanger : {}]}
+                testID="modal-execute-btn"
                 onPress={() => {
                   dispatchAction(confirmModal.action);
                   setConfirmModal((p) => ({ ...p, visible: false }));

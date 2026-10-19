@@ -7,6 +7,11 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node test-suite.js",
+    "test:command": "node test-command-submission.js",
+    "test:wol": "node test-wol.js",
+    "test:dpms": "node test-dpms-toggle.js",
+    "test:clear": "node test-clear-functionality.js",
+    "test:stealth": "node test-stealth-mode.js",
     "test:stress": "node stress-test.js"
   },
   "dependencies": {

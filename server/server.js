@@ -7,7 +7,7 @@ const http = require('http');
 const os = require('os');
 const fs = require('fs');
 const dgram = require('dgram');
-const { exec, spawn } = require('child_process');
+const { exec, spawn, execSync } = require('child_process');
 const pty = require('node-pty');
 const { WebSocketServer, WebSocket } = require('ws');
 const { Terminal: HeadlessTerminal } = require('@xterm/headless');
@@ -58,6 +58,14 @@ if (!process.env.HYPRLAND_INSTANCE_SIGNATURE) {
       const sigs = fs.readdirSync(hyprDir).filter((f) => !f.startsWith('.'));
       if (sigs.length > 0) process.env.HYPRLAND_INSTANCE_SIGNATURE = sigs[0];
     }
+  } catch (e) {}
+}
+
+if (!process.env.WAYLAND_DISPLAY) {
+  try {
+    const runtimeDir = process.env.XDG_RUNTIME_DIR || '/run/user/1000';
+    const waylandSockets = fs.readdirSync(runtimeDir).filter((f) => f.startsWith('wayland-'));
+    if (waylandSockets.length > 0) process.env.WAYLAND_DISPLAY = waylandSockets[0];
   } catch (e) {}
 }
 
@@ -329,6 +337,13 @@ let lastNetSample = null;
 let keepAwakeProcess = null;
 let stealthActive = false;
 let dpmsOn = true;
+try {
+  const monOut = execSync('hyprctl monitors -j 2>/dev/null', { timeout: 1000 }).toString();
+  const mons = JSON.parse(monOut);
+  if (Array.isArray(mons) && mons.length > 0 && typeof mons[0].dpmsStatus === 'boolean') {
+    dpmsOn = mons[0].dpmsStatus;
+  }
+} catch (e) {}
 
 function getCpuTemp() {
   try {
@@ -556,7 +571,7 @@ function handleAction(action, payload = {}) {
       return { success: true, message: 'Suspending PC into RAM...' };
 
     case 'lock':
-      exec('hyprlock || loginctl lock-session');
+      exec('omarchy-system-lock || loginctl lock-session');
       return { success: true, message: 'Desktop locked' };
 
     case 'stealth_toggle':
@@ -574,6 +589,9 @@ function handleAction(action, payload = {}) {
           keepAwakeProcess.on('error', () => {
             keepAwakeProcess = null;
           });
+          keepAwakeProcess.on('exit', () => {
+            keepAwakeProcess = null;
+          });
         }
       } else {
         exec('hyprctl dispatch dpms on');
@@ -587,8 +605,18 @@ function handleAction(action, payload = {}) {
       return { success: true, stealthMode: stealthActive, dpmsOn };
 
     case 'dpms_toggle':
-      dpmsOn = !dpmsOn;
-      exec(`hyprctl dispatch dpms ${dpmsOn ? 'on' : 'off'}`);
+      if (typeof payload.dpmsOn === 'boolean') {
+        dpmsOn = payload.dpmsOn;
+      } else if (payload.state === 'on') {
+        dpmsOn = true;
+      } else if (payload.state === 'off') {
+        dpmsOn = false;
+      } else {
+        dpmsOn = !dpmsOn;
+      }
+      exec(`hyprctl dispatch dpms ${dpmsOn ? 'on' : 'off'}`, (err) => {
+        if (err) console.error(`[DPMS] hyprctl error: ${err.message}`);
+      });
       return { success: true, dpmsOn };
 
     case 'send_wol':
@@ -861,7 +889,9 @@ wss.on('connection', (ws, req) => {
             headlessTerm.clear();
             headlessTerm.reset();
           } catch (e) {}
-          ws.send(JSON.stringify({ type: 'cleared' }));
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ type: 'cleared' }));
+          }
           if (ptyProcess) ptyProcess.write('\x0c');
           broadcastCleanScreen();
           break;

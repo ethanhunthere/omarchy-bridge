@@ -260,7 +260,7 @@ async function runMockActionEngineTests() {
         return { success: true, message: 'Suspending PC into RAM...' };
 
       case 'lock':
-        mockExec('hyprlock || loginctl lock-session');
+        mockExec('omarchy-system-lock || loginctl lock-session');
         return { success: true, message: 'Desktop locked' };
 
       case 'stealth_toggle':
@@ -385,6 +385,8 @@ async function runHttpAndWebSocketTests() {
       case 'suspend':
       case 'sleep':
         return { success: true, message: 'Suspending PC into RAM...' };
+      case 'lock':
+        return { success: true, message: 'Desktop locked' };
       case 'stealth_toggle':
         stealthActive = !stealthActive;
         dpmsOn = !stealthActive;

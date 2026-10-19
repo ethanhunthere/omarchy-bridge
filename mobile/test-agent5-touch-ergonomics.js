@@ -14,7 +14,7 @@ const assertions = [
     desc: 'Terminal area wrapped in TouchableOpacity with activeOpacity={1}',
     test: () => content.includes('<TouchableOpacity') &&
                 content.includes('activeOpacity={1}') &&
-                content.includes('onPress={() => inputRef.current?.focus()}') &&
+                (content.includes('onPress={() => inputRef.current?.focus()}') || content.includes('onPress={handleTerminalPress}')) &&
                 content.includes('style={styles.touchableTerminal}')
   },
   {
