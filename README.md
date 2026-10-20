@@ -21,7 +21,7 @@
 | **Spotty Signal Drops:** When you walk into an elevator or drop cellular signal 500 km away, SSH sessions freeze and disconnect, killing active foreground jobs. | **Persistent Session Engine:** Attaches to a detached, permanent `tmux` session (`omarchy-remote`). If your signal drops, your builds and AI runs continue undisturbed; reconnecting restores the exact running session and 10,000-line history instantly. |
 | **Garbled TUI & Braille Spinners:** Interactive terminal UIs like `agy` (Antigravity CLI), `htop`, or `vim` dump unreadable ANSI escape codes (`\x1b[2J\x1b[H`) into basic mobile terminal views. | **Server-Side Virtual Screen Grid:** Integrates `@xterm/headless` on the backend to maintain a true 2D terminal buffer, debouncing and broadcasting clean, human-readable screen lines with zero escape-code glitches. |
 | **Physical Display Stays On:** Running commands remotely leaves your laptop screen brightly glowing in an empty room, drawing power and risking visual snooping. | **One-Tap Stealth Mode:** Dispatches `hyprctl dispatch dpms off` to black out the physical monitor while acquiring an active `systemd-inhibit` lock so long-running jobs never idle-sleep. |
-| **Accidental Shutdowns:** Tapping the wrong command can brick your remote session until you get back home. | **Safe Two-Step Confirmation:** Destructive hardware commands (Shutdown, Reboot, Suspend) require an explicit confirmation modal with non-blocking Polkit/sudo fallbacks. |
+| **Accidental Shutdowns:** Tapping the wrong command can brick your remote session until you get back home. | **Safe Two-Step Confirmation & Laptop Protection:** Destructive hardware commands (Shutdown, Suspend) require an explicit confirmation modal with non-blocking Polkit/sudo fallbacks. Unsafe Reboot options are eliminated to prevent remote lockouts on Wi-Fi-only hardware. |
 | **Clunky Mobile Typing:** Standard mobile keyboards push input bars off-screen, mangle cursor history, or require awkward gestures to dismiss. | **Ergonomic Native Touch:** Pinned input bar directly above the keyboard, dedicated keycap ribbon (`Ctrl+C`, `Ctrl+D`, `ESC`, `TAB`, `▲`, `▼`, `Enter`), one-tap history recall, tap-outside/drag-to-dismiss keyboard interactions. |
 
 ---
@@ -36,7 +36,7 @@
 │  │  • Clean 2D Screen    │  • Live Telemetry (CPU)  │  │
 │  │  • Pinned Input Bar   │  • Stealth Mode (DPMS)   │  │
 │  │  • Keycap Accessory   │  • Wake-on-LAN Dispatch  │  │
-│  │  • History Navigation │  • Safe Poweroff/Reboot  │  │
+│  │  • History Navigation │  • Safe Suspend/Poweroff │  │
 │  │  • Tap-to-Dismiss     │  • Lock Screen Action    │  │
 │  └───────────────────────┴──────────────────────────┘  │
 └──────────────────────────┬─────────────────────────────┘
@@ -214,7 +214,7 @@ node server/master-qa-suite.js
 │ 10      │ 'Agent 12' │ 'AUTO-SCROLL Mode Toggle & Smooth Anchoring'    │ 'PASSED' │
 │ 11      │ 'Agent 13' │ 'Viewport Dynamic Resize Sync & Orientation'    │ 'PASSED' │
 │ 12      │ 'Agent 14' │ 'Shut Down Button & Safety Confirmation Modal'  │ 'PASSED' │
-│ 13      │ 'Agent 15' │ 'Reboot Button & Safety Confirmation Modal'     │ 'PASSED' │
+│ 13      │ 'Agent 15' │ 'Reboot Exclusion & Power Safety Confirmation Modal' │ 'PASSED' │
 │ 14      │ 'Agent 16' │ 'Suspend Button & Low-Power RAM Sleep Modal'    │ 'PASSED' │
 │ 15      │ 'Agent 17' │ 'Lock Screen Button & Polkit Execution'         │ 'PASSED' │
 │ 16      │ 'Agent 18' │ 'Stealth Remote Work Mode (DPMS Off + Inhibit)' │ 'PASSED' │

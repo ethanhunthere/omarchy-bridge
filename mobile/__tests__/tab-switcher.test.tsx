@@ -234,12 +234,12 @@ describe('mobile/App.tsx Segmented Control Buttons Audit', () => {
     expect(texts).toContain('RAM');
     expect(texts).toContain('BATTERY');
 
-    // 4. Verify all Machine Power Cards are rendered
+    // 4. Verify Machine Power Cards are rendered (Reboot excluded for remote Wi-Fi safety)
     expect(texts).toContain('MACHINE POWER');
     expect(texts).toContain('SHUT DOWN PC');
     expect(texts).toContain('systemctl poweroff');
-    expect(texts.some((t) => t.includes('REBOOT'))).toBe(true);
-    expect(texts).toContain('systemctl reboot');
+    expect(texts.some((t) => t.includes('REBOOT'))).toBe(false);
+    expect(texts).not.toContain('systemctl reboot');
     expect(texts.some((t) => t.includes('SUSPEND') || t.includes('SLEEP'))).toBe(true);
     expect(texts).toContain('systemctl suspend');
 

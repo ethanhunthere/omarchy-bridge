@@ -1,13 +1,14 @@
 /**
  * Automated Mock Verification & Audit Test Suite for Agent 15
- * (Reboot Button & Confirmation Modal Tester)
+ * (Reboot Exclusion & Power Safety Confirmation Tester)
  * Target: mobile/App.tsx, server/server.js, setup/50-omarchy-bridge.rules
  *
  * Verifies:
- * 1. Tapping 'REBOOT' opens the confirmation modal with title 'Reboot PC?', description, and red danger button.
- * 2. Tapping 'Cancel' dismisses the modal cleanly without dispatching.
- * 3. Tapping 'Execute' dispatches action 'reboot', which triggers systemctl reboot --no-ask-password.
- * 4. Systemd and polkit policy allow execution without password prompt.
+ * 1. The 'REBOOT PC' button is excluded from mobile/App.tsx to prevent accidental remote disconnection on Wi-Fi laptop.
+ * 2. Primary safe power mode 'SUSPEND (SLEEP)' is rendered.
+ * 3. Power action confirmation modal structure remains robust and secure.
+ * 4. Tapping 'Cancel' dismisses the modal cleanly without dispatching.
+ * 5. Polkit policy and systemctl handlers remain intact.
  */
 
 const fs = require('fs');
@@ -43,7 +44,7 @@ function logInfo(msg) {
 
 async function runTestSuite() {
   console.log('\n============================================================');
-  console.log(' AGENT 15: REBOOT BUTTON & CONFIRMATION MODAL AUDIT');
+  console.log(' AGENT 15: REBOOT EXCLUSION & POWER CONFIRMATION MODAL AUDIT');
   console.log('============================================================\n');
 
   // ============================================================
@@ -54,43 +55,21 @@ async function runTestSuite() {
   assert(fs.existsSync(APP_PATH), 'AppCode', 'mobile/App.tsx exists on disk', APP_PATH);
   const appCode = fs.readFileSync(APP_PATH, 'utf-8');
 
-  // 1.1 Verify Reboot button presence in power cards
-  const rebootCardRegex = /<TouchableOpacity[^>]*styles\.powerCardWarning[\s\S]*?<\/TouchableOpacity>/;
-  const rebootCardMatch = appCode.match(rebootCardRegex);
-  assert(!!rebootCardMatch, 'AppCode', 'Reboot card rendered with styles.powerCardWarning');
+  // 1.1 Verify Reboot button is completely excluded from power cards
+  const hasRebootBtn = appCode.includes('testID="reboot-btn"');
+  assert(!hasRebootBtn, 'AppCode', "Reboot button is completely removed from mobile/App.tsx (testID='reboot-btn' absent)");
 
-  const rebootCardSnippet = rebootCardMatch ? rebootCardMatch[0] : '';
+  // 1.2 Verify button label does NOT contain 'REBOOT PC'
+  const hasRebootLabel = appCode.includes('REBOOT PC');
+  assert(!hasRebootLabel, 'AppCode', "Reboot PC label is removed from UI");
 
-  // 1.2 Verify button label contains REBOOT and testID/accessibilityLabel
-  const hasRebootLabel = rebootCardSnippet.includes('REBOOT PC') || rebootCardSnippet.includes('REBOOT');
-  assert(hasRebootLabel, 'AppCode', "Reboot card displays 'REBOOT PC' / 'REBOOT' label", 'cardLabelWarning');
-  assert(
-    rebootCardSnippet.includes('testID="reboot-btn"') && rebootCardSnippet.includes('accessibilityLabel="REBOOT"'),
-    'AppCode',
-    "Reboot card includes testID='reboot-btn' and accessibilityLabel='REBOOT'"
-  );
+  // 1.3 Verify warning styles for reboot card are cleaned up
+  const hasPowerCardWarning = appCode.includes('powerCardWarning:');
+  assert(!hasPowerCardWarning, 'AppCode', "styles.powerCardWarning cleanly removed from stylesheet");
 
-  // 1.3 Verify command badge systemctl reboot
-  const hasCmdBadge = rebootCardSnippet.includes('systemctl reboot');
-  assert(hasCmdBadge, 'AppCode', "Reboot card displays command badge 'systemctl reboot'");
-
-  // 1.4 Verify promptConfirmation invocation with 'Reboot PC?' and action 'reboot'
-  const hasPromptReboot = rebootCardSnippet.includes("promptConfirmation(") &&
-                          rebootCardSnippet.includes("'Reboot PC?'") &&
-                          rebootCardSnippet.includes("'reboot'") &&
-                          rebootCardSnippet.includes("true");
-  assert(
-    hasPromptReboot,
-    'AppCode',
-    "Tapping Reboot button calls promptConfirmation('Reboot PC?', description, 'reboot', true)",
-    "promptConfirmation('Reboot PC?', ..., 'reboot', true)"
-  );
-
-  assert(
-    rebootCardSnippet.includes('systemctl reboot') && rebootCardSnippet.includes('restart'),
-    'AppCode',
-    'Reboot modal description explains systemctl reboot restart behavior'
-  );
+  // 1.4 Verify primary safe power mode SUSPEND is rendered
+  const hasSuspendBtn = appCode.includes('testID="suspend-btn"');
+  assert(hasSuspendBtn, 'AppCode', "Primary safe power mode 'SUSPEND (SLEEP)' exists (testID='suspend-btn')");
 
   // 1.5 Verify Confirmation Modal Component Structure
   const modalBlock = appCode.substring(appCode.indexOf('<Modal'), appCode.indexOf('</Modal>') + 8);
@@ -161,11 +140,20 @@ async function runTestSuite() {
       }
     }
 
-    onTapReboot() {
+    onTapSuspend() {
       this.promptConfirmation(
-        'Reboot PC?',
-        'This will execute "systemctl reboot" and restart the PC. Bridge will auto-reconnect on boot.',
-        'reboot',
+        'Suspend PC?',
+        'This will execute "systemctl suspend" to put the PC into low-power RAM sleep (~1W).',
+        'suspend',
+        false
+      );
+    }
+
+    onTapPoweroff() {
+      this.promptConfirmation(
+        'Shut Down PC?',
+        'Execute "systemctl poweroff"?',
+        'poweroff',
         true
       );
     }
@@ -185,15 +173,15 @@ async function runTestSuite() {
   // Test 2.1: Initial State
   assert(sim.confirmModal.visible === false, 'StateSim', 'Initial state: modal is hidden (visible === false)');
 
-  // Test 2.2: Tap REBOOT
-  sim.onTapReboot();
+  // Test 2.2: Tap Suspend
+  sim.onTapSuspend();
   assert(
     sim.confirmModal.visible === true &&
-    sim.confirmModal.title === 'Reboot PC?' &&
-    sim.confirmModal.action === 'reboot' &&
-    sim.confirmModal.isDanger === true,
+    sim.confirmModal.title === 'Suspend PC?' &&
+    sim.confirmModal.action === 'suspend' &&
+    sim.confirmModal.isDanger === false,
     'StateSim',
-    "Tapping 'REBOOT' opens modal with title 'Reboot PC?' and isDanger=true",
+    "Tapping 'SUSPEND' opens modal with title 'Suspend PC?' and isDanger=false",
     JSON.stringify(sim.confirmModal)
   );
 
@@ -210,9 +198,13 @@ async function runTestSuite() {
     "Tapping 'Cancel' does NOT dispatch any action or network message"
   );
 
-  // Test 2.4: Tap REBOOT again and then Tap Execute
-  sim.onTapReboot();
-  assert(sim.confirmModal.visible === true, 'StateSim', "Re-tapping 'REBOOT' re-opens the confirmation modal");
+  // Test 2.4: Tap Poweroff (Danger) and then Tap Execute
+  sim.onTapPoweroff();
+  assert(
+    sim.confirmModal.visible === true && sim.confirmModal.isDanger === true,
+    'StateSim',
+    "Tapping dangerous power action opens confirmation modal with isDanger=true"
+  );
 
   sim.onTapExecute();
   assert(
@@ -221,15 +213,15 @@ async function runTestSuite() {
     "Tapping 'Execute' dismisses the modal cleanly"
   );
   assert(
-    sim.dispatchedActions.length === 1 && sim.dispatchedActions[0].action === 'reboot',
+    sim.dispatchedActions.length === 1 && sim.dispatchedActions[0].action === 'poweroff',
     'StateSim',
-    "Tapping 'Execute' dispatches action 'reboot'",
+    "Tapping 'Execute' dispatches action 'poweroff'",
     JSON.stringify(sim.dispatchedActions[0])
   );
   assert(
-    sim.wsMessages.length === 1 && sim.wsMessages[0] === JSON.stringify({ type: 'action', action: 'reboot', payload: {} }),
+    sim.wsMessages.length === 1 && sim.wsMessages[0] === JSON.stringify({ type: 'action', action: 'poweroff', payload: {} }),
     'StateSim',
-    "Tapping 'Execute' sends WebSocket message { type: 'action', action: 'reboot', payload: {} }",
+    "Tapping 'Execute' sends WebSocket message",
     sim.wsMessages[0]
   );
 
@@ -241,33 +233,21 @@ async function runTestSuite() {
   assert(fs.existsSync(SERVER_PATH), 'ServerCode', 'server/server.js exists on disk', SERVER_PATH);
   const serverCode = fs.readFileSync(SERVER_PATH, 'utf-8');
 
-  // Verify 'reboot' case exists in handleAction
-  const hasRebootCase = serverCode.includes("case 'reboot':");
-  assert(hasRebootCase, 'ServerCode', "server.js handleAction() implements case 'reboot':");
+  // Verify 'suspend' case exists in handleAction
+  const hasSuspendCase = serverCode.includes("case 'suspend':");
+  assert(hasSuspendCase, 'ServerCode', "server.js handleAction() implements case 'suspend':");
 
-  // Verify exact command executed
-  const rebootExecRegex = /case 'reboot':[\s\S]*?exec\(['"]([^'"]+)['"]\)/;
-  const rebootExecMatch = serverCode.match(rebootExecRegex);
-  const rebootCmd = rebootExecMatch ? rebootExecMatch[1] : '';
-
-  assert(
-    rebootCmd.includes('systemctl reboot --no-ask-password'),
-    'ServerCode',
-    "Reboot action executes 'systemctl reboot --no-ask-password'",
-    rebootCmd
-  );
+  // Verify exact suspend command executed
+  const suspendExecRegex = /case 'suspend':[\s\S]*?exec\(['"]([^'"]+)['"]\)/;
+  const suspendExecMatch = serverCode.match(suspendExecRegex);
+  const suspendCmd = suspendExecMatch ? suspendExecMatch[1] : '';
 
   assert(
-    rebootCmd.includes('sudo -n systemctl reboot'),
+    suspendCmd.includes('systemctl suspend --no-ask-password'),
     'ServerCode',
-    "Reboot action includes non-blocking sudo fallback 'sudo -n systemctl reboot'",
-    rebootCmd
+    "Suspend action executes 'systemctl suspend --no-ask-password'",
+    suspendCmd
   );
-
-  // Verify response payload
-  const hasRebootResponse = serverCode.includes("message: 'Rebooting Omarchy PC now...'") ||
-                            serverCode.includes("success: true");
-  assert(hasRebootResponse, 'ServerCode', "Reboot action immediately returns success response prior to reboot execution");
 
   // ============================================================
   // Suite 4: Systemd, Polkit, and Sudo Passwordless Policy Audit
@@ -278,10 +258,10 @@ async function runTestSuite() {
   assert(fs.existsSync(POLKIT_PATH), 'Policy', 'setup/50-omarchy-bridge.rules exists', POLKIT_PATH);
   const polkitRules = fs.readFileSync(POLKIT_PATH, 'utf-8');
   assert(
-    polkitRules.includes('org.freedesktop.login1.reboot') &&
-    polkitRules.includes('org.freedesktop.login1.reboot-multiple-sessions'),
+    polkitRules.includes('org.freedesktop.login1.suspend') &&
+    polkitRules.includes('org.freedesktop.login1.power-off'),
     'Policy',
-    'Polkit rule covers org.freedesktop.login1.reboot and reboot-multiple-sessions'
+    'Polkit rule covers login1 suspend and power-off'
   );
   assert(
     polkitRules.includes('polkit.Result.YES'),
@@ -293,42 +273,20 @@ async function runTestSuite() {
   assert(fs.existsSync(SUDOERS_PATH), 'Policy', 'setup/omarchy-bridge.sudoers exists', SUDOERS_PATH);
   const sudoersRules = fs.readFileSync(SUDOERS_PATH, 'utf-8');
   assert(
-    sudoersRules.includes('NOPASSWD') && sudoersRules.includes('/usr/bin/systemctl reboot'),
+    sudoersRules.includes('NOPASSWD') && sudoersRules.includes('/usr/bin/systemctl suspend'),
     'Policy',
-    'Sudoers rule configures NOPASSWD for /usr/bin/systemctl reboot'
+    'Sudoers rule configures NOPASSWD for /usr/bin/systemctl suspend'
   );
 
   // 4.3 Live Polkit Authorization Check
   try {
-    execSync('pkcheck --process $$ --action-id org.freedesktop.login1.reboot 2>&1');
-    assert(true, 'LivePolicy', 'pkcheck allows org.freedesktop.login1.reboot without password prompt', 'Status: OK (Exit 0)');
+    execSync('pkcheck --process $$ --action-id org.freedesktop.login1.suspend 2>&1');
+    assert(true, 'LivePolicy', 'pkcheck allows org.freedesktop.login1.suspend without password prompt', 'Status: OK (Exit 0)');
   } catch (err) {
-    assert(false, 'LivePolicy', 'pkcheck org.freedesktop.login1.reboot', err.message);
+    assert(false, 'LivePolicy', 'pkcheck org.freedesktop.login1.suspend', err.message);
   }
 
-  try {
-    execSync('pkcheck --process $$ --action-id org.freedesktop.login1.reboot-multiple-sessions 2>&1');
-    assert(true, 'LivePolicy', 'pkcheck allows org.freedesktop.login1.reboot-multiple-sessions without password prompt', 'Status: OK (Exit 0)');
-  } catch (err) {
-    assert(false, 'LivePolicy', 'pkcheck org.freedesktop.login1.reboot-multiple-sessions', err.message);
-  }
-
-  // 4.4 Live Systemctl Dry-Run Execution
-  try {
-    const start = Date.now();
-    execSync('systemctl reboot --dry-run --no-ask-password 2>&1');
-    const elapsed = Date.now() - start;
-    assert(
-      elapsed < 500,
-      'LivePolicy',
-      'systemctl reboot --dry-run --no-ask-password executes cleanly without prompt',
-      `Completed in ${elapsed}ms (Exit 0)`
-    );
-  } catch (err) {
-    assert(false, 'LivePolicy', 'systemctl reboot --dry-run --no-ask-password failed', err.message);
-  }
-
-  // 4.5 Live Sudo Non-Blocking Execution Check
+  // 4.4 Live Sudo Non-Blocking Execution Check
   try {
     const sudoStart = Date.now();
     try {
@@ -366,10 +324,9 @@ async function runTestSuite() {
           const parsed = JSON.parse(data.toString());
           if (parsed.type === 'action') {
             receivedAction = parsed;
-            // Simulate the exact server handler logic with a mock executor
-            if (parsed.action === 'reboot') {
-              simulatedCommand = 'systemctl reboot --no-ask-password || sudo -n systemctl reboot';
-              ws.send(JSON.stringify({ type: 'action_result', success: true, message: 'Rebooting Omarchy PC now...' }));
+            if (parsed.action === 'suspend') {
+              simulatedCommand = 'systemctl suspend --no-ask-password || sudo -n systemctl suspend';
+              ws.send(JSON.stringify({ type: 'action_result', success: true, message: 'Suspending Omarchy PC into RAM sleep...' }));
             }
           }
         } catch (e) {}
@@ -386,15 +343,15 @@ async function runTestSuite() {
     const wsClient = new WebSocket(`ws://127.0.0.1:${MOCK_PORT}`);
 
     wsClient.on('open', () => {
-      // Simulate App.tsx dispatchAction('reboot')
-      wsClient.send(JSON.stringify({ type: 'action', action: 'reboot', payload: {} }));
+      // Simulate App.tsx dispatchAction('suspend')
+      wsClient.send(JSON.stringify({ type: 'action', action: 'suspend', payload: {} }));
     });
 
     wsClient.on('message', (msg) => {
       try {
         const res = JSON.parse(msg.toString());
         assert(
-          res.success === true && res.message.includes('Rebooting'),
+          res.success === true && res.message.includes('Suspending'),
           'MockE2E',
           'Mock server received action and returned immediate success confirmation',
           JSON.stringify(res)
@@ -421,15 +378,15 @@ async function runTestSuite() {
   });
 
   assert(
-    receivedAction && receivedAction.action === 'reboot',
+    receivedAction && receivedAction.action === 'suspend',
     'MockE2E',
-    "Mock WebSocket server validated receipt of { type: 'action', action: 'reboot' }"
+    "Mock WebSocket server validated receipt of { type: 'action', action: 'suspend' }"
   );
 
   assert(
-    simulatedCommand === 'systemctl reboot --no-ask-password || sudo -n systemctl reboot',
+    simulatedCommand === 'systemctl suspend --no-ask-password || sudo -n systemctl suspend',
     'MockE2E',
-    "Simulated action execution produced bit-exact systemctl reboot command",
+    "Simulated action execution produced bit-exact systemctl suspend command",
     simulatedCommand
   );
 

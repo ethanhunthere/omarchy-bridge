@@ -757,27 +757,6 @@ export default function App() {
             <Text style={styles.cardDesc}>Recommended for laptops. Low-power RAM standby (~1W), instant wake.</Text>
           </TouchableOpacity>
 
-          {/* Reboot */}
-          <TouchableOpacity
-            style={[styles.powerCard, styles.powerCardWarning]}
-            testID="reboot-btn"
-            accessibilityLabel="REBOOT"
-            onPress={() =>
-              promptConfirmation(
-                'Reboot PC?',
-                'This will execute "systemctl reboot" and restart the PC. Bridge will auto-reconnect on boot.',
-                'reboot',
-                true
-              )
-            }
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardLabelWarning}>REBOOT PC</Text>
-              <Text style={styles.cmdBadge}>systemctl reboot</Text>
-            </View>
-            <Text style={styles.cardDesc}>Clean system restart; auto-reconnects on boot</Text>
-          </TouchableOpacity>
-
           {/* Shut Down (Warning: No remote power-on over Wi-Fi) */}
           <TouchableOpacity
             style={[styles.powerCard, styles.powerCardDanger]}
@@ -1281,10 +1260,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#181214',
     borderColor: '#351c21',
   },
-  powerCardWarning: {
-    backgroundColor: '#181611',
-    borderColor: '#362a19',
-  },
   powerCardActive: {
     backgroundColor: '#111814',
     borderColor: '#1e3828',
@@ -1312,12 +1287,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#f87171',
-  },
-  cardLabelWarning: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#fbbf24',
   },
   cardLabelActive: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
