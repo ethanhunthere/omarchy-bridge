@@ -736,23 +736,25 @@ export default function App() {
           {/* Machine Power Controls */}
           <Text style={styles.groupHeading}>MACHINE POWER</Text>
 
-          {/* Shut Down */}
+          {/* Suspend / Sleep (Primary Safe Option for Laptops) */}
           <TouchableOpacity
-            style={[styles.powerCard, styles.powerCardDanger]}
+            style={[styles.powerCard, styles.powerCardPrimary]}
+            testID="suspend-btn"
+            accessibilityLabel="SUSPEND"
             onPress={() =>
               promptConfirmation(
-                'Shut Down PC?',
-                'This will execute "systemctl poweroff" and cleanly power off the PC.',
-                'poweroff',
-                true
+                'Suspend PC?',
+                'This will execute "systemctl suspend" to put the PC into low-power RAM sleep (~1W). Screen and fans turn off; preserves state for instant wake.',
+                'suspend',
+                false
               )
             }
           >
             <View style={styles.cardHeader}>
-              <Text style={styles.cardLabelDanger}>SHUT DOWN PC</Text>
-              <Text style={styles.cmdBadge}>systemctl poweroff</Text>
+              <Text style={styles.cardLabelPrimary}>SUSPEND (SLEEP)</Text>
+              <Text style={styles.cmdBadge}>systemctl suspend</Text>
             </View>
-            <Text style={styles.cardDesc}>Powers down system immediately</Text>
+            <Text style={styles.cardDesc}>Recommended for laptops. Low-power RAM standby (~1W), instant wake.</Text>
           </TouchableOpacity>
 
           {/* Reboot */}
@@ -773,28 +775,26 @@ export default function App() {
               <Text style={styles.cardLabelWarning}>REBOOT PC</Text>
               <Text style={styles.cmdBadge}>systemctl reboot</Text>
             </View>
-            <Text style={styles.cardDesc}>Clean system restart</Text>
+            <Text style={styles.cardDesc}>Clean system restart; auto-reconnects on boot</Text>
           </TouchableOpacity>
 
-          {/* Suspend */}
+          {/* Shut Down (Warning: No remote power-on over Wi-Fi) */}
           <TouchableOpacity
-            style={styles.powerCard}
-            testID="suspend-btn"
-            accessibilityLabel="SUSPEND"
+            style={[styles.powerCard, styles.powerCardDanger]}
             onPress={() =>
               promptConfirmation(
-                'Suspend PC?',
-                'This will execute "systemctl suspend" to put the PC into low-power RAM sleep.',
-                'suspend',
-                false
+                'Shut Down PC?',
+                'Warning: Laptop is on Wi-Fi and cannot be powered on remotely after full shutdown. Use Suspend (Sleep) instead if you need remote access. Execute "systemctl poweroff"?',
+                'poweroff',
+                true
               )
             }
           >
             <View style={styles.cardHeader}>
-              <Text style={styles.cardLabel}>SUSPEND</Text>
-              <Text style={styles.cmdBadge}>systemctl suspend</Text>
+              <Text style={styles.cardLabelDanger}>SHUT DOWN PC</Text>
+              <Text style={styles.cmdBadge}>systemctl poweroff</Text>
             </View>
-            <Text style={styles.cardDesc}>Low-power memory standby</Text>
+            <Text style={styles.cardDesc}>Powers down completely (requires physical power button to turn back on)</Text>
           </TouchableOpacity>
 
           {/* Stealth Display Mode */}
@@ -1273,6 +1273,10 @@ const styles = StyleSheet.create({
     padding: 12,
     marginBottom: 8,
   },
+  powerCardPrimary: {
+    backgroundColor: '#121720',
+    borderColor: '#1e2c40',
+  },
   powerCardDanger: {
     backgroundColor: '#181214',
     borderColor: '#351c21',
@@ -1296,6 +1300,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '700',
     color: '#f4f4f5',
+  },
+  cardLabelPrimary: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#60a5fa',
   },
   cardLabelDanger: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',

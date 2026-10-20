@@ -1,5 +1,5 @@
 {
-  "timestamp": "2026-10-19T15:41:38.709Z",
+  "timestamp": "2026-10-20T10:51:23.818Z",
   "agent": "Agent 8: ESC & TAB Shell Autocomplete Tester",
   "summary": "Full verification of ESC and TAB keycaps in mobile/App.tsx and server/server.js. All audits, completions, prompt cancellations, and vi modal exits PASSED.",
   "totalTests": 15,
@@ -10,91 +10,91 @@
       "name": "App.tsx ESC keycap bound to sendSignal(\"esc\")",
       "detail": "",
       "status": "PASS",
-      "time": "2026-10-19T15:41:30.054Z"
+      "time": "2026-10-20T10:51:15.165Z"
     },
     {
       "name": "App.tsx TAB keycap bound to sendSignal(\"tab\")",
       "detail": "",
       "status": "PASS",
-      "time": "2026-10-19T15:41:30.055Z"
+      "time": "2026-10-20T10:51:15.165Z"
     },
     {
       "name": "App.tsx sendSignal serializes { type: \"signal\", signal } payload",
       "detail": "",
       "status": "PASS",
-      "time": "2026-10-19T15:41:30.055Z"
+      "time": "2026-10-20T10:51:15.165Z"
     },
     {
       "name": "server.js esc handler writes ASCII 0x1b (ESC) to ptyProcess",
       "detail": "",
       "status": "PASS",
-      "time": "2026-10-19T15:41:30.055Z"
+      "time": "2026-10-20T10:51:15.165Z"
     },
     {
       "name": "server.js tab handler writes ASCII 0x09 (TAB) to ptyProcess",
       "detail": "",
       "status": "PASS",
-      "time": "2026-10-19T15:41:30.055Z"
+      "time": "2026-10-20T10:51:15.165Z"
     },
     {
       "name": "Connected to live omarchy-bridge daemon",
       "detail": "",
       "status": "PASS",
-      "time": "2026-10-19T15:41:30.061Z"
+      "time": "2026-10-20T10:51:15.171Z"
     },
     {
       "name": "Fish shell filename autocomplete triggered via TAB signal",
       "detail": "cat /etc/hostcat /etc/hostecho \"TOKEN_1792423907369_A4\"^C⏎\n\n",
       "status": "PASS",
-      "time": "2026-10-19T15:41:31.666Z"
+      "time": "2026-10-20T10:51:16.775Z"
     },
     {
       "name": "ESC signal dispatched to cancel completion pager",
       "detail": "",
       "status": "PASS",
-      "time": "2026-10-19T15:41:31.917Z"
+      "time": "2026-10-20T10:51:17.026Z"
     },
     {
       "name": "Fish shell command autocomplete triggered via TAB signal",
       "detail": "whoa -> whoami",
       "status": "PASS",
-      "time": "2026-10-19T15:41:32.969Z"
+      "time": "2026-10-20T10:51:18.079Z"
     },
     {
       "name": "Bash shell filename autocomplete triggered via TAB signal",
       "detail": "cat /etc/hostn -> /etc/hostname",
       "status": "PASS",
-      "time": "2026-10-19T15:41:34.072Z"
+      "time": "2026-10-20T10:51:19.184Z"
     },
     {
       "name": "Bash shell command autocomplete triggered via TAB signal",
       "detail": "whoa -> whoami",
       "status": "PASS",
-      "time": "2026-10-19T15:41:34.675Z"
+      "time": "2026-10-20T10:51:19.784Z"
     },
     {
       "name": "Bash interactive prompt (reverse-i-search) activated",
       "detail": "",
       "status": "PASS",
-      "time": "2026-10-19T15:41:35.277Z"
+      "time": "2026-10-20T10:51:20.386Z"
     },
     {
       "name": "ESC signal cleanly cancelled interactive reverse-i-search prompt",
       "detail": "",
       "status": "PASS",
-      "time": "2026-10-19T15:41:35.577Z"
+      "time": "2026-10-20T10:51:20.686Z"
     },
     {
       "name": "ESC signal dispatched to leave vi INSERT mode for NORMAL mode",
       "detail": "",
       "status": "PASS",
-      "time": "2026-10-19T15:41:37.885Z"
+      "time": "2026-10-20T10:51:23.001Z"
     },
     {
       "name": "Vi modal editor cleanly exited to shell prompt via ESC + :q!",
       "detail": "",
       "status": "PASS",
-      "time": "2026-10-19T15:41:38.487Z"
+      "time": "2026-10-20T10:51:23.603Z"
     }
   ],
   "verifications": {
