@@ -60,27 +60,27 @@ function runMobileAppAudit() {
 
   const content = fs.readFileSync(appTsxPath, 'utf8');
 
-  // 1.1 Verify presence of 'MONITOR (DPMS)' button
+  // 1.1 Verify clean removal of redundant 'MONITOR (DPMS)' button (superseded by STEALTH MODE)
   const hasMonitorDpmsText = content.includes('MONITOR (DPMS)');
-  if (hasMonitorDpmsText) {
-    logPass('MobileAudit', "App.tsx contains 'MONITOR (DPMS)' button label");
+  if (!hasMonitorDpmsText) {
+    logPass('MobileAudit', "App.tsx cleanly excludes redundant 'MONITOR (DPMS)' button");
   } else {
-    logFail('MobileAudit', "App.tsx contains 'MONITOR (DPMS)' button label", 'Text not found');
+    logFail('MobileAudit', "App.tsx excludes 'MONITOR (DPMS)' button", 'Found old text');
   }
 
-  // 1.2 Verify button dispatches action 'dpms_toggle'
-  const dispatchesDpmsToggle = /dispatchAction\(\s*['"]dpms_toggle['"]\s*\)/.test(content);
-  if (dispatchesDpmsToggle) {
-    logPass('MobileAudit', "Tapping 'MONITOR (DPMS)' dispatches action 'dpms_toggle'");
+  // 1.2 Verify unified STEALTH MODE dispatches action 'stealth_toggle'
+  const dispatchesStealthToggle = /dispatchAction\(\s*['"]stealth_toggle['"]\s*\)/.test(content);
+  if (dispatchesStealthToggle) {
+    logPass('MobileAudit', "STEALTH MODE dispatches action 'stealth_toggle' (DPMS + Sleep Inhibit)");
   } else {
-    logFail('MobileAudit', "Tapping 'MONITOR (DPMS)' dispatches action 'dpms_toggle'", 'dispatchAction("dpms_toggle") not found');
+    logFail('MobileAudit', "STEALTH MODE dispatches action 'stealth_toggle'", 'dispatchAction("stealth_toggle") not found');
   }
 
-  // 1.3 Verify testID or accessibilityLabel for automated testing
-  const hasTestId = content.includes('testID="monitor-dpms-toggle"') || content.includes('testID=\'monitor-dpms-toggle\'');
-  const hasA11y = content.includes('accessibilityLabel="MONITOR (DPMS)"') || content.includes('accessibilityLabel=\'MONITOR (DPMS)\'');
+  // 1.3 Verify testID or accessibilityLabel for stealth button
+  const hasTestId = content.includes('testID="stealth-mode-btn"');
+  const hasA11y = content.includes('accessibilityLabel="STEALTH MODE"');
   if (hasTestId && hasA11y) {
-    logPass('MobileAudit', "Button includes testID='monitor-dpms-toggle' and accessibilityLabel='MONITOR (DPMS)'");
+    logPass('MobileAudit', "Button includes testID='stealth-mode-btn' and accessibilityLabel='STEALTH MODE'");
   } else {
     logFail('MobileAudit', 'TestID and accessibilityLabel', `hasTestId: ${hasTestId}, hasA11y: ${hasA11y}`);
   }

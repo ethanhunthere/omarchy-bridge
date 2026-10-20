@@ -733,8 +733,11 @@ export default function App() {
             </View>
           </View>
 
-          {/* Machine Power Controls */}
-          <Text style={styles.groupHeading}>MACHINE POWER</Text>
+          {/* Active System Controls */}
+          <View style={styles.groupHeaderRow}>
+            <Text style={styles.groupHeading}>SYSTEM CONTROLS</Text>
+            <Text style={styles.profileBadge}>WI-FI SAFE</Text>
+          </View>
 
           {/* Suspend / Sleep (Primary Safe Option for Laptops) */}
           <TouchableOpacity
@@ -754,32 +757,13 @@ export default function App() {
               <Text style={styles.cardLabelPrimary}>SUSPEND (SLEEP)</Text>
               <Text style={styles.cmdBadge}>systemctl suspend</Text>
             </View>
-            <Text style={styles.cardDesc}>Recommended for laptops. Low-power RAM standby (~1W), instant wake.</Text>
-          </TouchableOpacity>
-
-          {/* Shut Down (Warning: No remote power-on over Wi-Fi) */}
-          <TouchableOpacity
-            style={[styles.powerCard, styles.powerCardDanger]}
-            onPress={() =>
-              promptConfirmation(
-                'Shut Down PC?',
-                'Warning: Laptop is on Wi-Fi and cannot be powered on remotely after full shutdown. Use Suspend (Sleep) instead if you need remote access. Execute "systemctl poweroff"?',
-                'poweroff',
-                true
-              )
-            }
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardLabelDanger}>SHUT DOWN PC</Text>
-              <Text style={styles.cmdBadge}>systemctl poweroff</Text>
-            </View>
-            <Text style={styles.cardDesc}>Powers down completely (requires physical power button to turn back on)</Text>
+            <Text style={styles.cardDesc}>Recommended for laptops. Low-power RAM standby (~1W) with instant keystroke resume.</Text>
           </TouchableOpacity>
 
           {/* Stealth Display Mode */}
-          <Text style={styles.groupHeading}>DISPLAY & REMOTE SESSION</Text>
-
           <TouchableOpacity
+            testID="stealth-mode-btn"
+            accessibilityLabel="STEALTH MODE"
             style={[styles.powerCard, telemetry?.stealthMode ? styles.powerCardActive : {}]}
             onPress={() => dispatchAction('stealth_toggle')}
           >
@@ -798,50 +782,27 @@ export default function App() {
             </Text>
           </TouchableOpacity>
 
-          {/* Physical Monitor DPMS Toggle */}
-          <TouchableOpacity
-            testID="monitor-dpms-toggle"
-            accessibilityLabel="MONITOR (DPMS)"
-            style={[styles.powerCard, telemetry?.dpmsOn === false ? styles.powerCardActive : {}]}
-            onPress={() => dispatchAction('dpms_toggle')}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={telemetry?.dpmsOn === false ? styles.cardLabelActive : styles.cardLabel}>
-                MONITOR (DPMS)
-              </Text>
-              <Text style={styles.cmdBadge}>
-                {telemetry?.dpmsOn === false ? 'hyprctl dpms off' : 'hyprctl dpms on'}
-              </Text>
-            </View>
-            <Text style={styles.cardDesc}>
-              {telemetry?.dpmsOn === false
-                ? 'Physical screen is powered off (DPMS). Tap to restore display.'
-                : 'Toggle physical monitor power on/off independently of stealth sleep inhibit.'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Wake-on-LAN */}
-          <TouchableOpacity
-            testID="wake-on-lan-btn"
-            accessibilityLabel="SEND WAKE-ON-LAN"
-            style={styles.powerCard}
-            onPress={() => dispatchAction('send_wol')}
-          >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardLabel}>SEND WAKE-ON-LAN</Text>
-              <Text style={styles.cmdBadge}>UDP magic packet</Text>
-            </View>
-            <Text style={styles.cardDesc}>Broadcasts wake signal to network adapter</Text>
-          </TouchableOpacity>
-
           {/* Lock Screen */}
-          <TouchableOpacity style={styles.powerCard} onPress={() => dispatchAction('lock')}>
+          <TouchableOpacity
+            testID="lock-screen-btn"
+            accessibilityLabel="LOCK SCREEN"
+            style={styles.powerCard}
+            onPress={() => dispatchAction('lock')}
+          >
             <View style={styles.cardHeader}>
               <Text style={styles.cardLabel}>LOCK SCREEN</Text>
               <Text style={styles.cmdBadge}>omarchy-system-lock</Text>
             </View>
-            <Text style={styles.cardDesc}>Locks desktop session & secures 1Password</Text>
+            <Text style={styles.cardDesc}>Instantly secures Hyprland desktop session and locks 1Password vault.</Text>
           </TouchableOpacity>
+
+          {/* Wi-Fi Profile Safety Notice */}
+          <View style={styles.safetyNoticeCard}>
+            <Text style={styles.safetyNoticeTitle}>REMOTE WI-FI PROFILE</Text>
+            <Text style={styles.safetyNoticeText}>
+              Unused high-risk poweroff, reboot, and Wake-on-LAN controls are excluded to prevent remote session disconnection on wireless hardware.
+            </Text>
+          </View>
         </ScrollView>
       )}
 
@@ -1200,12 +1161,12 @@ const styles = StyleSheet.create({
   },
   hudContainer: {
     flexDirection: 'row',
-    backgroundColor: '#12141a',
-    borderRadius: 6,
+    backgroundColor: '#111319',
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#1e212b',
-    padding: 12,
-    marginBottom: 16,
+    borderColor: '#1d222e',
+    padding: 14,
+    marginBottom: 18,
   },
   hudCol: {
     flex: 1,
@@ -1213,48 +1174,67 @@ const styles = StyleSheet.create({
   },
   hudDivider: {
     width: 1,
-    backgroundColor: '#1e212b',
+    backgroundColor: '#1d222e',
     marginHorizontal: 8,
   },
   hudTitle: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 9,
     fontWeight: '700',
-    color: '#71717a',
-    marginBottom: 3,
+    color: '#717686',
+    marginBottom: 4,
+    letterSpacing: 0.8,
   },
   hudStat: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
-    color: '#f4f4f5',
+    color: '#f4f4f6',
     marginBottom: 2,
   },
   hudSub: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 9,
-    color: '#a1a1aa',
+    color: '#8e93a4',
+  },
+  groupHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+    marginTop: 4,
   },
   groupHeading: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 10,
     fontWeight: '700',
-    color: '#71717a',
+    color: '#717686',
     letterSpacing: 1.2,
-    marginBottom: 8,
-    marginTop: 6,
+  },
+  profileBadge: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 8,
+    fontWeight: '700',
+    color: '#38bdf8',
+    backgroundColor: '#0c1a24',
+    borderColor: '#163b52',
+    borderWidth: 1,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    letterSpacing: 0.5,
   },
   powerCard: {
-    backgroundColor: '#12141a',
-    borderRadius: 6,
+    backgroundColor: '#111319',
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#1e212b',
-    padding: 12,
-    marginBottom: 8,
+    borderColor: '#1d222e',
+    padding: 14,
+    marginBottom: 10,
   },
   powerCardPrimary: {
-    backgroundColor: '#121720',
-    borderColor: '#1e2c40',
+    backgroundColor: '#111624',
+    borderColor: '#21334f',
   },
   powerCardDanger: {
     backgroundColor: '#181214',
@@ -1268,45 +1248,65 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   cardLabel: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
-    color: '#f4f4f5',
+    color: '#f4f4f6',
   },
   cardLabelPrimary: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: '#60a5fa',
   },
-  cardLabelDanger: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#f87171',
-  },
   cardLabelActive: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: '700',
     color: '#4ade80',
   },
   cmdBadge: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 9,
-    color: '#71717a',
-    backgroundColor: '#0a0b0d',
-    paddingHorizontal: 6,
+    color: '#8b92a5',
+    backgroundColor: '#0a0b0f',
+    borderColor: '#1d222e',
+    borderWidth: 1,
+    paddingHorizontal: 7,
     paddingVertical: 2,
-    borderRadius: 3,
+    borderRadius: 4,
   },
   cardDesc: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 11,
+    lineHeight: 16,
+    color: '#949ba8',
+    marginTop: 2,
+  },
+  safetyNoticeCard: {
+    backgroundColor: '#0d0f14',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#191c26',
+    padding: 12,
+    marginTop: 10,
+  },
+  safetyNoticeTitle: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#63687b',
+    letterSpacing: 1,
+    marginBottom: 4,
+  },
+  safetyNoticeText: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 10,
-    color: '#a1a1aa',
+    color: '#717688',
+    lineHeight: 15,
   },
 
   // Modal

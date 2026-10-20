@@ -50,20 +50,12 @@ async function runMobileAudit() {
     }
     const content = fs.readFileSync(appPath, 'utf8');
 
-    // 1.1 Verify Wake-on-LAN button rendering & onPress binding
-    const wolButtonRegex = /<TouchableOpacity[^>]*onPress=\{[^}]*dispatchAction\(['"]send_wol['"]\)[^}]*\}[^>]*>[\s\S]*?SEND WAKE-ON-LAN[\s\S]*?<\/TouchableOpacity>/;
-    const buttonMatch = content.match(wolButtonRegex);
-    if (buttonMatch) {
-      pass('MobileUI', "WAKE-ON-LAN button exists and binds onPress to dispatchAction('send_wol')", 'Matched component structure');
+    // 1.1 Verify clean exclusion of unused Wake-on-LAN button on Wi-Fi hardware
+    const hasWolBtn = content.includes('testID="wake-on-lan-btn"') || content.includes('SEND WAKE-ON-LAN');
+    if (!hasWolBtn) {
+      pass('MobileUI', 'WAKE-ON-LAN button cleanly excluded from UI for Wi-Fi laptop profile', 'Button absent');
     } else {
-      // Fallback check for separate onPress and label
-      const hasOnPress = content.includes("dispatchAction('send_wol')");
-      const hasLabel = content.includes('SEND WAKE-ON-LAN') || content.includes('WAKE-ON-LAN');
-      if (hasOnPress && hasLabel) {
-        pass('MobileUI', "WAKE-ON-LAN button calls dispatchAction('send_wol')", 'Found dispatchAction and label');
-      } else {
-        fail('MobileUI', 'WAKE-ON-LAN button verification', 'Could not locate button bound to send_wol');
-      }
+      fail('MobileUI', 'WAKE-ON-LAN button exclusion', 'Unexpected button found');
     }
 
     // 1.2 Verify dispatchAction implementation sends JSON over WebSocket
@@ -74,15 +66,15 @@ async function runMobileAudit() {
       fail('MobileUI', 'dispatchAction structure', 'dispatchAction does not serialize action message as expected');
     }
 
-    // 1.3 Verify button resides in POWER tab
+    // 1.3 Verify safety notice resides in POWER tab
     const powerViewIdx = content.indexOf("{activeTab === 'power' &&");
-    const wolIdx = content.indexOf("dispatchAction('send_wol')");
+    const noticeIdx = content.indexOf('safetyNoticeCard');
     const endScrollView = powerViewIdx !== -1 ? content.indexOf('</ScrollView>', powerViewIdx) : -1;
 
-    if (powerViewIdx !== -1 && wolIdx > powerViewIdx && wolIdx < endScrollView) {
-      pass('MobileUI', 'WAKE-ON-LAN button is housed within the POWER view ScrollView', `Position: L${content.substring(0, wolIdx).split('\n').length}`);
+    if (powerViewIdx !== -1 && noticeIdx > powerViewIdx && noticeIdx < endScrollView) {
+      pass('MobileUI', 'Wi-Fi safety notice is housed within the POWER view ScrollView', `Position: L${content.substring(0, noticeIdx).split('\n').length}`);
     } else {
-      fail('MobileUI', 'View Placement', 'WAKE-ON-LAN button not found in activeTab === power section');
+      fail('MobileUI', 'View Placement', 'Safety notice not found in activeTab === power section');
     }
 
   } catch (err) {

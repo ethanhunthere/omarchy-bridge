@@ -200,10 +200,7 @@ describe('mobile/App.tsx Segmented Control Buttons Audit', () => {
 
     // Verify POWER view components are NOT rendered
     expect(texts).not.toContain('CPU LOAD');
-    expect(texts).not.toContain('MACHINE POWER');
-    expect(texts).not.toContain('SHUT DOWN PC');
-    expect(texts).not.toContain('systemctl poweroff');
-    expect(texts).not.toContain('systemctl reboot');
+    expect(texts).not.toContain('SYSTEM CONTROLS');
     expect(texts).not.toContain('systemctl suspend');
   });
 
@@ -234,20 +231,20 @@ describe('mobile/App.tsx Segmented Control Buttons Audit', () => {
     expect(texts).toContain('RAM');
     expect(texts).toContain('BATTERY');
 
-    // 4. Verify Machine Power Cards are rendered (Reboot excluded for remote Wi-Fi safety)
-    expect(texts).toContain('MACHINE POWER');
-    expect(texts).toContain('SHUT DOWN PC');
-    expect(texts).toContain('systemctl poweroff');
-    expect(texts.some((t) => t.includes('REBOOT'))).toBe(false);
-    expect(texts).not.toContain('systemctl reboot');
+    // 4. Verify Active System Controls are rendered (Essential Wi-Fi safe options)
+    expect(texts).toContain('SYSTEM CONTROLS');
+    expect(texts).toContain('WI-FI SAFE');
     expect(texts.some((t) => t.includes('SUSPEND') || t.includes('SLEEP'))).toBe(true);
     expect(texts).toContain('systemctl suspend');
-
-    // 5. Verify Display & Remote Session cards
-    expect(texts).toContain('DISPLAY & REMOTE SESSION');
     expect(texts.some((t) => t.includes('STEALTH'))).toBe(true);
-    expect(texts).toContain('SEND WAKE-ON-LAN');
     expect(texts.some((t) => t.includes('LOCK'))).toBe(true);
+
+    // 5. Verify Unused & high-risk options are cleanly excluded
+    expect(texts).not.toContain('SHUT DOWN PC');
+    expect(texts).not.toContain('systemctl poweroff');
+    expect(texts).not.toContain('MONITOR (DPMS)');
+    expect(texts).not.toContain('SEND WAKE-ON-LAN');
+    expect(texts.some((t) => t.includes('REBOOT'))).toBe(false);
 
     // 6. Verify Terminal View & Keycap Ribbon are unmounted / not rendered
     expect(texts).not.toContain('[omarchy-remote ready]');

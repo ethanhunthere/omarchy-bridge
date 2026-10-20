@@ -33,11 +33,11 @@
 │                   iOS Device (iPhone)                  │
 │  ┌───────────────────────┬──────────────────────────┐  │
 │  │   [TERMINAL TAB]      │     [POWER / HUD TAB]    │  │
-│  │  • Clean 2D Screen    │  • Live Telemetry (CPU)  │  │
-│  │  • Pinned Input Bar   │  • Stealth Mode (DPMS)   │  │
-│  │  • Keycap Accessory   │  • Wake-on-LAN Dispatch  │  │
-│  │  • History Navigation │  • Safe Suspend/Poweroff │  │
-│  │  • Tap-to-Dismiss     │  • Lock Screen Action    │  │
+│  │  • Clean 2D Screen    │  • Precision Telemetry   │  │
+│  │  • Pinned Input Bar   │  • Suspend Mode (~1W)    │  │
+│  │  • Keycap Accessory   │  • Stealth Mode (DPMS)   │  │
+│  │  • History Navigation │  • Lock Desktop Session  │  │
+│  │  • Tap-to-Dismiss     │  • Wi-Fi Remote Profile  │  │
 │  └───────────────────────┴──────────────────────────┘  │
 └──────────────────────────┬─────────────────────────────┘
                            │
@@ -213,7 +213,7 @@ node server/master-qa-suite.js
 │ 9       │ 'Agent 11' │ 'Terminal Clear Button'                         │ 'PASSED' │
 │ 10      │ 'Agent 12' │ 'AUTO-SCROLL Mode Toggle & Smooth Anchoring'    │ 'PASSED' │
 │ 11      │ 'Agent 13' │ 'Viewport Dynamic Resize Sync & Orientation'    │ 'PASSED' │
-│ 12      │ 'Agent 14' │ 'Shut Down Button & Safety Confirmation Modal'  │ 'PASSED' │
+│ 12      │ 'Agent 14' │ 'Shut Down Exclusion & Power Safety Modal'           │ 'PASSED' │
 │ 13      │ 'Agent 15' │ 'Reboot Exclusion & Power Safety Confirmation Modal' │ 'PASSED' │
 │ 14      │ 'Agent 16' │ 'Suspend Button & Low-Power RAM Sleep Modal'    │ 'PASSED' │
 │ 15      │ 'Agent 17' │ 'Lock Screen Button & Polkit Execution'         │ 'PASSED' │

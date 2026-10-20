@@ -50,18 +50,18 @@ async function runAudit() {
   const appSource = fs.readFileSync(appPath, 'utf8');
 
   // 1.1 Button markup and styles
-  const hasShutDownButton = appSource.includes('SHUT DOWN PC') || appSource.includes('SHUT DOWN');
-  assert(hasShutDownButton, 'App.tsx contains SHUT DOWN button element');
+  const hasShutDownButton = appSource.includes('SHUT DOWN PC');
+  assert(!hasShutDownButton, 'App.tsx cleanly excludes SHUT DOWN button on Wi-Fi laptop profile');
 
-  const hasPowerCardDanger = appSource.includes('styles.powerCardDanger');
-  assert(hasPowerCardDanger, 'SHUT DOWN button uses powerCardDanger styling');
+  const hasPowerCardPrimary = appSource.includes('styles.powerCardPrimary');
+  assert(hasPowerCardPrimary, 'SUSPEND button uses powerCardPrimary styling');
 
-  // 1.2 promptConfirmation invocation for shutdown
-  const promptConfirmationRegex = /promptConfirmation\s*\(\s*['"]Shut Down PC\?['"]\s*,\s*(['"][\s\S]*?['"])\s*,\s*['"]poweroff['"]\s*,\s*true\s*\)/;
+  // 1.2 promptConfirmation invocation for safe power standby
+  const promptConfirmationRegex = /promptConfirmation\s*\(\s*['"]Suspend PC\?['"]\s*,\s*(['"][\s\S]*?['"])\s*,\s*['"]suspend['"]\s*,\s*false\s*\)/;
   const matchPrompt = appSource.match(promptConfirmationRegex);
   assert(
     !!matchPrompt,
-    "SHUT DOWN onPress calls promptConfirmation('Shut Down PC?', description, 'poweroff', true)",
+    "SUSPEND onPress calls promptConfirmation('Suspend PC?', description, 'suspend', false)",
     matchPrompt ? `Description: ${matchPrompt[1].trim()}` : 'Not matched'
   );
 

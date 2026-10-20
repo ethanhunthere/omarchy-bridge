@@ -23,7 +23,7 @@ const testTracks = [
   { id: 'Agent 11', name: 'Terminal Clear Button', cmd: 'node server/test-clear-functionality.js' },
   { id: 'Agent 12', name: 'AUTO-SCROLL Mode Toggle & Smooth Anchoring', cmd: 'node mobile/test-agent12-autoscroll.js' },
   { id: 'Agent 13', name: 'Viewport Dynamic Resize Sync & Orientation', cmd: 'node server/test-viewport-resize.js' },
-  { id: 'Agent 14', name: 'Shut Down Button & Safety Confirmation Modal', cmd: 'node server/test-shutdown-modal.js' },
+  { id: 'Agent 14', name: 'Shut Down Exclusion & Power Safety Modal', cmd: 'node server/test-shutdown-modal.js' },
   { id: 'Agent 15', name: 'Reboot Exclusion & Power Safety Confirmation Modal', cmd: 'node mobile/test-agent15-reboot-modal.js' },
   { id: 'Agent 16', name: 'Suspend Button & Low-Power RAM Sleep Modal', cmd: 'node mobile/test-agent16-suspend-modal.js' },
   { id: 'Agent 17', name: 'Lock Screen Button & Polkit Execution', cmd: 'node server/test-lock-screen.js' },
