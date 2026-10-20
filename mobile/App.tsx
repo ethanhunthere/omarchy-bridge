@@ -494,18 +494,9 @@ export default function App() {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0a0b0d" />
 
-      {/* Clean Industrial Header Bar (No AI glow, no cyberpunk) */}
+      {/* Centered Premium Glassy Header Bar */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>omarchy-remote</Text>
-          {latency !== null && (
-            <View style={styles.latencyPill}>
-              <Text style={styles.latencyText}>{latency}ms</Text>
-            </View>
-          )}
-        </View>
-
-        {/* Clean Segmented Control */}
+        {/* Centered Glassy Segmented Tabs */}
         <View style={styles.segmentedControl}>
           <TouchableOpacity
             style={[styles.segmentBtn, activeTab === 'terminal' && styles.segmentBtnActive]}
@@ -531,6 +522,12 @@ export default function App() {
             </Text>
           </TouchableOpacity>
         </View>
+
+        {latency !== null && (
+          <View style={styles.latencyPill}>
+            <Text style={styles.latencyText}>{latency}ms</Text>
+          </View>
+        )}
       </View>
 
       {/* ==================================================== */}
@@ -854,68 +851,72 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Header Bar
+  // Centered Glassy Header Bar
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
     paddingVertical: 10,
-    backgroundColor: '#101116',
+    backgroundColor: '#0a0b0d',
     borderBottomWidth: 1,
-    borderBottomColor: '#1e2028',
+    borderBottomColor: '#171922',
+    position: 'relative',
   },
   headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+    display: 'none',
   },
   headerTitle: {
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#f4f4f5',
-    letterSpacing: 0.5,
+    display: 'none',
   },
   latencyPill: {
-    backgroundColor: '#181a22',
+    position: 'absolute',
+    right: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
     borderWidth: 1,
-    borderColor: '#262835',
-    paddingHorizontal: 5,
-    paddingVertical: 1,
-    borderRadius: 3,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
   latencyText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 10,
-    color: '#a1a1aa',
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#8e93a4',
   },
 
-  // Segmented Control
+  // Centered Glassy Segmented Tabs
   segmentedControl: {
     flexDirection: 'row',
-    backgroundColor: '#161820',
-    borderRadius: 4,
-    padding: 2,
+    backgroundColor: 'rgba(24, 27, 36, 0.75)',
+    borderRadius: 20,
+    padding: 3,
     borderWidth: 1,
-    borderColor: '#222530',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
   },
   segmentBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 3,
+    paddingHorizontal: 18,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   segmentBtnActive: {
     backgroundColor: '#282b37',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.15)',
   },
   segmentText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 10,
+    fontSize: 11,
     fontWeight: '700',
-    color: '#71717a',
+    color: '#7e8494',
+    letterSpacing: 0.8,
   },
   segmentTextActive: {
-    color: '#f4f4f5',
+    color: '#ffffff',
+    fontWeight: '800',
   },
 
   // Terminal Viewport
