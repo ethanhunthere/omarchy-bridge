@@ -4,7 +4,7 @@
 > *Zero lag. Zero dropped sessions. True headless PTY with server-side virtual terminal emulation.*
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20iOS%20%7C%20Android-green.svg)](https://github.com/illyrianqubic/omarchy-bridge)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20iOS%20%7C%20Android-green.svg)](https://github.com/ethanhunthere/omarchy-bridge)
 [![Node](https://img.shields.io/badge/Node.js-22%20LTS-brightgreen.svg)](https://nodejs.org/)
 [![Expo](https://img.shields.io/badge/Expo-57%20(React%20Native)-black.svg)](https://expo.dev/)
 
@@ -82,7 +82,7 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/illyrianqubic/omarchy-bridge.git ~/Projects/omarchy-bridge
+git clone https://github.com/ethanhunthere/omarchy-bridge.git ~/Projects/omarchy-bridge
 cd ~/Projects/omarchy-bridge/server
 
 # Install backend dependencies
@@ -237,4 +237,4 @@ TOTAL TRACKS: 19 | PASSED: 19 | FAILED: 0 (100% Pass Rate)
 
 ## 📄 License
 
-MIT © 2026 [illyrianqubic](https://github.com/illyrianqubic). Open source and community driven.
+MIT © 2026 [ethanhunthere](https://github.com/ethanhunthere). Open source and community driven.

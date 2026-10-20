@@ -1,150 +1,150 @@
 {
-  "timestamp": "2026-10-19T15:38:08.010Z",
+  "timestamp": "2026-10-19T15:41:22.419Z",
   "summary": "All Ctrl+C signal, haptics, UI styling, and process interruption checks PASSED.",
   "tests": [
     {
       "status": "PASS",
       "title": "Ctrl+C Button JSX Declaration",
       "details": "Found with keycapCtrlC style & sendSignal handler",
-      "time": "2026-10-19T15:38:03.777Z"
+      "time": "2026-10-19T15:41:18.345Z"
     },
     {
       "status": "PASS",
       "title": "Ctrl+C Container Styling",
       "details": "Alert styling verified: background #231518, border #3e1d23",
-      "time": "2026-10-19T15:38:03.778Z"
+      "time": "2026-10-19T15:41:18.358Z"
     },
     {
       "status": "PASS",
       "title": "Ctrl+C Text Styling",
       "details": "Alert red/coral color #f87171, bold monospace font",
-      "time": "2026-10-19T15:38:03.778Z"
+      "time": "2026-10-19T15:41:18.358Z"
     },
     {
       "status": "PASS",
       "title": "Tactile Haptics Feedback",
       "details": "sendSignal invokes medium impact tactile haptic feedback",
-      "time": "2026-10-19T15:38:03.779Z"
+      "time": "2026-10-19T15:41:18.359Z"
     },
     {
       "status": "PASS",
       "title": "WebSocket Payload Format",
       "details": "Correct JSON structure: { type: \"signal\", signal: \"ctrl_c\" }",
-      "time": "2026-10-19T15:38:03.779Z"
+      "time": "2026-10-19T15:41:18.359Z"
     },
     {
       "status": "PASS",
       "title": "Server ASCII Byte Handler",
       "details": "server.js writes \\x03 (ETX / ASCII 3 / SIGINT) directly to ptyProcess",
-      "time": "2026-10-19T15:38:03.779Z"
+      "time": "2026-10-19T15:41:18.360Z"
     },
     {
       "status": "PASS",
       "title": "WebSocket Connected",
       "details": "Connected to ws://127.0.0.1:19001?token=omarchy-bridge-secure-key-2026",
-      "time": "2026-10-19T15:38:03.795Z"
+      "time": "2026-10-19T15:41:18.374Z"
     },
     {
       "status": "PASS",
       "title": "Terminal Initialized",
       "details": "Session: omarchy-remote, Shell: /usr/bin/fish",
-      "time": "2026-10-19T15:38:03.797Z"
+      "time": "2026-10-19T15:41:18.375Z"
     },
     {
       "status": "PASS",
       "title": "Prompt Recovered (PROMPT_INIT_AGENT_6)",
       "details": "Shell returned to prompt and executed canary command",
-      "time": "2026-10-19T15:38:04.743Z"
+      "time": "2026-10-19T15:41:19.320Z"
     },
     {
       "status": "PASS",
       "title": "ping 127.0.0.1 Active",
       "details": "ping confirmed running in foreground",
-      "time": "2026-10-19T15:38:05.225Z"
+      "time": "2026-10-19T15:41:19.761Z"
     },
     {
       "status": "PASS",
       "title": "ping Interrupted by Ctrl+C",
-      "details": "Interrupted in 29ms, returned to shell",
-      "time": "2026-10-19T15:38:05.255Z"
+      "details": "Interrupted in 5ms, returned to shell",
+      "time": "2026-10-19T15:41:19.766Z"
     },
     {
       "status": "PASS",
       "title": "Prompt Recovered (CANARY_AFTER_PING)",
       "details": "Shell returned to prompt and executed canary command",
-      "time": "2026-10-19T15:38:05.286Z"
+      "time": "2026-10-19T15:41:19.797Z"
     },
     {
       "status": "PASS",
       "title": "sleep 60 Running",
       "details": "Confirmed sleep 60 process active in foreground",
-      "time": "2026-10-19T15:38:05.714Z"
+      "time": "2026-10-19T15:41:20.212Z"
     },
     {
       "status": "PASS",
       "title": "sleep 60 Interrupted by Ctrl+C",
       "details": "Terminated in 4ms (far before 60s timeout)",
-      "time": "2026-10-19T15:38:05.718Z"
+      "time": "2026-10-19T15:41:20.216Z"
     },
     {
       "status": "PASS",
       "title": "Prompt Recovered (CANARY_AFTER_SLEEP)",
       "details": "Shell returned to prompt and executed canary command",
-      "time": "2026-10-19T15:38:05.780Z"
+      "time": "2026-10-19T15:41:20.246Z"
     },
     {
       "status": "PASS",
       "title": "cat Running",
       "details": "Blocking stdin cat process confirmed",
-      "time": "2026-10-19T15:38:06.257Z"
+      "time": "2026-10-19T15:41:20.709Z"
     },
     {
       "status": "PASS",
       "title": "cat Interrupted by Ctrl+C",
       "details": "Terminated in 4ms, returned to shell prompt",
-      "time": "2026-10-19T15:38:06.261Z"
+      "time": "2026-10-19T15:41:20.713Z"
     },
     {
       "status": "PASS",
       "title": "Prompt Recovered (CANARY_AFTER_CAT)",
       "details": "Shell returned to prompt and executed canary command",
-      "time": "2026-10-19T15:38:06.292Z"
+      "time": "2026-10-19T15:41:20.744Z"
     },
     {
       "status": "PASS",
       "title": "Continuous Stream Running",
       "details": "Detected high-frequency stream output",
-      "time": "2026-10-19T15:38:06.947Z"
+      "time": "2026-10-19T15:41:21.361Z"
     },
     {
       "status": "PASS",
       "title": "Stream Interrupted Immediately",
       "details": "Terminated in 4ms",
-      "time": "2026-10-19T15:38:06.952Z"
+      "time": "2026-10-19T15:41:21.365Z"
     },
     {
       "status": "PASS",
       "title": "Prompt Recovered (CANARY_AFTER_STREAM)",
       "details": "Shell returned to prompt and executed canary command",
-      "time": "2026-10-19T15:38:06.982Z"
+      "time": "2026-10-19T15:41:21.396Z"
     },
     {
       "status": "PASS",
       "title": "15 Rapid Ctrl+C Signals Dispatched",
       "details": "Dispatched rapid-fire burst without errors",
-      "time": "2026-10-19T15:38:07.779Z"
+      "time": "2026-10-19T15:41:22.188Z"
     },
     {
       "status": "PASS",
       "title": "Prompt Recovered (CANARY_BURST_COMPLETE)",
       "details": "Shell returned to prompt and executed canary command",
-      "time": "2026-10-19T15:38:08.010Z"
+      "time": "2026-10-19T15:41:22.419Z"
     },
     {
       "status": "PASS",
       "title": "Shell Robust Under Ctrl+C Burst",
       "details": "PTY process stable and prompt responsive",
-      "time": "2026-10-19T15:38:08.010Z"
+      "time": "2026-10-19T15:41:22.419Z"
     }
   ],
   "status": "SUCCESS"
