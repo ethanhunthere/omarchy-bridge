@@ -6,6 +6,7 @@
 const http = require('http');
 const os = require('os');
 const fs = require('fs');
+const crypto = require('crypto');
 const dgram = require('dgram');
 const { exec, spawn, execSync } = require('child_process');
 const pty = require('node-pty');
@@ -628,9 +629,70 @@ function handleAction(action, payload = {}) {
 }
 
 // ==========================================
+// 6.5 Security Hardening & Rate Limiting
+// ==========================================
+function timingSafeTokenCheck(providedToken, expectedToken) {
+  if (typeof providedToken !== 'string' || typeof expectedToken !== 'string') return false;
+  const bufA = Buffer.from(providedToken, 'utf8');
+  const bufB = Buffer.from(expectedToken, 'utf8');
+  if (bufA.length !== bufB.length) {
+    crypto.timingSafeEqual(bufA, bufA);
+    return false;
+  }
+  return crypto.timingSafeEqual(bufA, bufB);
+}
+
+const failedAuthAttempts = new Map();
+
+function isClientRateLimited(ip) {
+  const entry = failedAuthAttempts.get(ip);
+  if (!entry) return false;
+  if (entry.lockedUntil && Date.now() < entry.lockedUntil) return true;
+  if (entry.lockedUntil && Date.now() >= entry.lockedUntil) {
+    failedAuthAttempts.delete(ip);
+    return false;
+  }
+  return false;
+}
+
+function recordAuthFailure(ip) {
+  const now = Date.now();
+  const entry = failedAuthAttempts.get(ip) || { count: 0, firstAttempt: now, lockedUntil: 0 };
+  if (now - entry.firstAttempt > 60000) {
+    entry.count = 1;
+    entry.firstAttempt = now;
+    entry.lockedUntil = 0;
+  } else {
+    entry.count++;
+  }
+  if (entry.count >= 25) {
+    entry.lockedUntil = now + 60000;
+    console.warn(`[SECURITY ALERT] Rate-limiting IP ${ip}: 25 failed auth attempts.`);
+  }
+  failedAuthAttempts.set(ip, entry);
+}
+
+function recordAuthSuccess(ip) {
+  failedAuthAttempts.delete(ip);
+}
+
+function getPrimaryLanIp() {
+  const interfaces = os.networkInterfaces();
+  for (const name of Object.keys(interfaces)) {
+    for (const iface of interfaces[name]) {
+      if (iface.family === 'IPv4' && !iface.internal) {
+        return iface.address;
+      }
+    }
+  }
+  return '127.0.0.1';
+}
+
+// ==========================================
 // 7. HTTP & REST Layer
 // ==========================================
 const server = http.createServer(async (req, res) => {
+  const clientIp = req.socket?.remoteAddress || 'unknown';
   const reqUrl = safeParseUrl(req.url, req.headers.host);
   if (!reqUrl) {
     res.writeHead(400, { 'Content-Type': 'text/plain' });
@@ -638,10 +700,11 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const queryToken = reqUrl.searchParams.get('token');
-  const authHeader = req.headers['authorization'];
-  const token = queryToken || (authHeader ? authHeader.replace(/^Bearer\s+/i, '') : null);
-
+  // Strict Security Headers
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Content-Security-Policy', "default-src 'none'");
+  res.setHeader('Referrer-Policy', 'no-referrer');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
@@ -658,11 +721,23 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (token !== AUTH_TOKEN) {
+  if (isClientRateLimited(clientIp)) {
+    res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '60' });
+    res.end(JSON.stringify({ error: 'Too Many Requests - Rate limit exceeded' }));
+    return;
+  }
+
+  const queryToken = reqUrl.searchParams.get('token');
+  const authHeader = req.headers['authorization'];
+  const token = queryToken || (authHeader ? authHeader.replace(/^Bearer\s+/i, '') : null);
+
+  if (!timingSafeTokenCheck(token, AUTH_TOKEN)) {
+    recordAuthFailure(clientIp);
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unauthorized' }));
     return;
   }
+  recordAuthSuccess(clientIp);
 
   if (reqUrl.pathname === '/api/telemetry') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -752,16 +827,25 @@ server.on('upgrade', (request, socket, head) => {
     return;
   }
 
+  const clientIp = socket.remoteAddress || 'unknown';
+  if (isClientRateLimited(clientIp)) {
+    socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n');
+    socket.destroy();
+    return;
+  }
+
   const queryToken = reqUrl.searchParams.get('token');
   const authHeader = request.headers['authorization'];
   const headerToken = authHeader ? authHeader.replace(/^Bearer\s+/i, '') : null;
   const token = queryToken || headerToken;
 
-  if (token !== AUTH_TOKEN) {
+  if (!timingSafeTokenCheck(token, AUTH_TOKEN)) {
+    recordAuthFailure(clientIp);
     socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
     socket.destroy();
     return;
   }
+  recordAuthSuccess(clientIp);
 
   wss.handleUpgrade(request, socket, head, (ws) => {
     wss.emit('connection', ws, request);
@@ -912,10 +996,11 @@ wss.on('connection', (ws, req) => {
 // 9. Start Daemon
 // ==========================================
 server.listen(PORT, HOST, () => {
+  const lanIp = getPrimaryLanIp();
   console.log(`\n============================================================`);
   console.log(` Omarchy Ultra-Fast Bridge Daemon Active on Port ${PORT}`);
   console.log(` Session: ${TMUX_SESSION} | Shell: ${USER_SHELL} -l`);
-  console.log(` LAN Endpoint: ws://192.168.1.6:${PORT}?token=${AUTH_TOKEN}`);
+  console.log(` LAN Endpoint: ws://${lanIp}:${PORT}?token=${AUTH_TOKEN}`);
   console.log(`============================================================\n`);
 });
 

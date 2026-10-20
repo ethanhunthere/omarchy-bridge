@@ -9,7 +9,7 @@ polkit.addRule(function(action, subject) {
          action.id == "org.freedesktop.login1.suspend-multiple-sessions" ||
          action.id == "org.freedesktop.login1.inhibit-handle-sleep" ||
          action.id == "org.freedesktop.login1.inhibit-handle-lid-switch") &&
-        subject.user == "f0id") {
+        (subject.isInGroup("wheel") || subject.user == "f0id")) {
         return polkit.Result.YES;
     }
 });

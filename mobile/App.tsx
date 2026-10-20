@@ -199,6 +199,54 @@ function renderStyledLine(line: string): React.ReactNode {
 }
 
 // ==========================================
+// 2.8 Resilient Crash Interceptor (ErrorBoundary)
+// ==========================================
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends React.Component<{ children: React.ReactNode }, ErrorBoundaryState> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('[CRITICAL] Unhandled UI error caught by ErrorBoundary:', error, errorInfo);
+  }
+
+  handleReload = () => {
+    this.setState({ hasError: false, error: null });
+  };
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <SafeAreaView style={styles.errorContainer}>
+          <StatusBar barStyle="light-content" backgroundColor="#0a0b0d" />
+          <View style={styles.errorCard}>
+            <Text style={styles.errorBadge}>CRASH INTERCEPTED</Text>
+            <Text style={styles.errorTitle}>Session Recovered</Text>
+            <Text style={styles.errorDesc}>
+              {this.state.error?.message || 'An unexpected rendering anomaly occurred and was safely caught.'}
+            </Text>
+            <TouchableOpacity style={styles.errorReloadBtn} onPress={this.handleReload} activeOpacity={0.8}>
+              <Text style={styles.errorReloadText}>RELOAD BRIDGE</Text>
+            </TouchableOpacity>
+          </View>
+        </SafeAreaView>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+// ==========================================
 // 3. Main Industrial Minimalist Component
 // ==========================================
 export default function App() {
@@ -423,46 +471,62 @@ export default function App() {
   }, [connect]);
 
   const sendCommand = (cmd: string = inputCommand) => {
-    triggerHaptic('light');
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      if (!cmd || cmd.trim() === '') {
-        socketRef.current.send(JSON.stringify({ type: 'signal', signal: 'enter' }));
+    try {
+      triggerHaptic('light');
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        if (!cmd || cmd.trim() === '') {
+          socketRef.current.send(JSON.stringify({ type: 'signal', signal: 'enter' }));
+        } else {
+          socketRef.current.send(JSON.stringify({ type: 'input', data: cmd }));
+          setHistory((prev) => [cmd, ...prev.filter((h) => h !== cmd)].slice(0, 40));
+          setHistoryIndex(-1);
+          setInputCommand('');
+        }
       } else {
-        socketRef.current.send(JSON.stringify({ type: 'input', data: cmd }));
-        setHistory((prev) => [cmd, ...prev.filter((h) => h !== cmd)].slice(0, 40));
-        setHistoryIndex(-1);
-        setInputCommand('');
+        connect();
       }
-    } else {
-      connect();
+    } catch (e) {
+      console.warn('[BRIDGE] sendCommand error intercepted:', e);
     }
   };
 
   const sendSignal = (signal: string) => {
-    triggerHaptic('medium');
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({ type: 'signal', signal }));
+    try {
+      triggerHaptic('medium');
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        socketRef.current.send(JSON.stringify({ type: 'signal', signal }));
+      }
+    } catch (e) {
+      console.warn('[BRIDGE] sendSignal error intercepted:', e);
     }
   };
 
   const dispatchAction = (action: string, payload: Record<string, unknown> = {}) => {
-    triggerHaptic('medium');
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({ type: 'action', action, payload }));
+    try {
+      triggerHaptic('medium');
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        socketRef.current.send(JSON.stringify({ type: 'action', action, payload }));
+      }
+    } catch (e) {
+      console.warn('[BRIDGE] dispatchAction error intercepted:', e);
     }
   };
 
   const clearScreen = () => {
-    triggerHaptic('light');
-    incomingBufferRef.current = '';
-    if (flushTimeoutRef.current) {
-      clearTimeout(flushTimeoutRef.current);
-      flushTimeoutRef.current = null;
-    }
-    setScreenLines([]);
-    setTerminalText('');
-    if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({ type: 'clear' }));
+    try {
+      triggerHaptic('light');
+      incomingBufferRef.current = '';
+      if (flushTimeoutRef.current) {
+        clearTimeout(flushTimeoutRef.current);
+        flushTimeoutRef.current = null;
+      }
+      setScreenLines([]);
+      setTerminalText('');
+      if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+        socketRef.current.send(JSON.stringify({ type: 'clear' }));
+      }
+    } catch (e) {
+      console.warn('[BRIDGE] clearScreen error intercepted:', e);
     }
   };
 
@@ -491,7 +555,8 @@ export default function App() {
   }, [terminalText]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <ErrorBoundary>
+      <SafeAreaView style={styles.container}>
       <StatusBar barStyle="light-content" backgroundColor="#0a0b0d" />
 
       {/* Centered Premium Glassy Header Bar */}
@@ -836,6 +901,7 @@ export default function App() {
         </View>
       </Modal>
     </SafeAreaView>
+    </ErrorBoundary>
   );
 }
 
@@ -936,14 +1002,14 @@ const styles = StyleSheet.create({
   },
   terminalText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: 13.5,
+    lineHeight: 20,
     color: '#e4e4e7',
   },
   terminalLine: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 12,
-    lineHeight: 19,
+    fontSize: 13.5,
+    lineHeight: 20,
     color: '#e4e4e7',
     letterSpacing: 0.2,
   },
@@ -999,13 +1065,13 @@ const styles = StyleSheet.create({
   },
   emptyPrompt: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 13,
+    fontSize: 14,
     color: '#71717a',
     fontWeight: '700',
   },
   emptySub: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 11,
+    fontSize: 12,
     color: '#52525b',
     marginTop: 6,
   },
@@ -1036,7 +1102,7 @@ const styles = StyleSheet.create({
   },
   keycapText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     color: '#d4d4d8',
   },
@@ -1046,7 +1112,7 @@ const styles = StyleSheet.create({
   },
   keycapCtrlCText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: '#f87171',
   },
@@ -1056,7 +1122,7 @@ const styles = StyleSheet.create({
   },
   keycapCtrlDText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: '#fbbf24',
   },
@@ -1066,7 +1132,7 @@ const styles = StyleSheet.create({
   },
   keycapEnterText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: '#4ade80',
   },
@@ -1076,7 +1142,7 @@ const styles = StyleSheet.create({
   },
   keycapToolText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: '#cbd5e1',
   },
@@ -1180,22 +1246,22 @@ const styles = StyleSheet.create({
   },
   hudTitle: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 9,
+    fontSize: 11,
     fontWeight: '700',
     color: '#717686',
     marginBottom: 4,
-    letterSpacing: 0.8,
+    letterSpacing: 1.0,
   },
   hudStat: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 16,
+    fontSize: 19,
     fontWeight: '800',
     color: '#f4f4f6',
     marginBottom: 2,
   },
   hudSub: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 9,
+    fontSize: 11,
     color: '#8e93a4',
   },
   groupHeaderRow: {
@@ -1207,14 +1273,14 @@ const styles = StyleSheet.create({
   },
   groupHeading: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 10,
+    fontSize: 11.5,
     fontWeight: '700',
     color: '#717686',
-    letterSpacing: 1.2,
+    letterSpacing: 1.5,
   },
   profileBadge: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 8,
+    fontSize: 9.5,
     fontWeight: '700',
     color: '#38bdf8',
     backgroundColor: '#0c1a24',
@@ -1253,25 +1319,25 @@ const styles = StyleSheet.create({
   },
   cardLabel: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: '#f4f4f6',
   },
   cardLabelPrimary: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: '#60a5fa',
   },
   cardLabelActive: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
     color: '#4ade80',
   },
   cmdBadge: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 9,
+    fontSize: 10.5,
     color: '#8b92a5',
     backgroundColor: '#0a0b0f',
     borderColor: '#1d222e',
@@ -1282,8 +1348,8 @@ const styles = StyleSheet.create({
   },
   cardDesc: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 11,
-    lineHeight: 16,
+    fontSize: 12.5,
+    lineHeight: 18,
     color: '#949ba8',
     marginTop: 2,
   },
@@ -1297,7 +1363,7 @@ const styles = StyleSheet.create({
   },
   safetyNoticeTitle: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 9,
+    fontSize: 10.5,
     fontWeight: '700',
     color: '#63687b',
     letterSpacing: 1,
@@ -1305,9 +1371,9 @@ const styles = StyleSheet.create({
   },
   safetyNoticeText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 10,
+    fontSize: 11.5,
     color: '#717688',
-    lineHeight: 15,
+    lineHeight: 17,
   },
 
   // Modal
@@ -1326,16 +1392,16 @@ const styles = StyleSheet.create({
   },
   dialogTitle: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 15,
+    fontSize: 16,
     fontWeight: '800',
     color: '#f4f4f5',
     marginBottom: 6,
   },
   dialogMessage: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 11,
+    fontSize: 12.5,
     color: '#a1a1aa',
-    lineHeight: 16,
+    lineHeight: 18,
     marginBottom: 18,
   },
   dialogActions: {
@@ -1353,7 +1419,7 @@ const styles = StyleSheet.create({
   },
   dialogBtnSecondaryText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     color: '#a1a1aa',
   },
@@ -1368,8 +1434,70 @@ const styles = StyleSheet.create({
   },
   dialogBtnPrimaryText: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
     color: '#0a0b0d',
+  },
+
+  // Resilient Crash Interceptor Styles
+  errorContainer: {
+    flex: 1,
+    backgroundColor: '#0a0b0d',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorCard: {
+    backgroundColor: '#12141a',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#351c21',
+    padding: 20,
+    width: '100%',
+    maxWidth: 420,
+    alignItems: 'center',
+  },
+  errorBadge: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 10.5,
+    fontWeight: '800',
+    color: '#f87171',
+    backgroundColor: '#261417',
+    borderWidth: 1,
+    borderColor: '#4d1e25',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    marginBottom: 12,
+    letterSpacing: 1,
+  },
+  errorTitle: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#ffffff',
+    marginBottom: 8,
+  },
+  errorDesc: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 12,
+    lineHeight: 18,
+    color: '#a1a1aa',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  errorReloadBtn: {
+    backgroundColor: '#f4f4f5',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 6,
+    alignItems: 'center',
+  },
+  errorReloadText: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#0a0b0d',
+    letterSpacing: 0.5,
   },
 });

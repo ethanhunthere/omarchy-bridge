@@ -1,5 +1,24 @@
+# Dependencies
 node_modules/
 .expo/
 dist/
+
+# Logs & Debug Dumps
 npm-debug.*
 *.log
+*.log.*
+server/tmux-*.log
+server/tmux-out-*.log
+
+# Local Environment & Secrets
+.env
+.env.local
+server/.env
+
+# Temporary Test Reports
+server/*-report.json
+server/viewport-resize-audit-report.json
+
+# System & Editor
+.DS_Store
+Thumbs.db
