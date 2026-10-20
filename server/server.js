@@ -222,15 +222,22 @@ setInterval(() => {
 }, 25);
 
 let screenBroadcastTimer = null;
+let lastBroadcastScreen = '';
+
 function broadcastCleanScreen() {
   if (clients.size === 0) return;
   const lines = getCleanScreenLines(120);
+  const serialized = JSON.stringify(lines);
+  if (serialized === lastBroadcastScreen) return;
+  lastBroadcastScreen = serialized;
   const payload = JSON.stringify({ type: 'screen', lines });
   for (const client of clients) {
     if (client.readyState === WebSocket.OPEN) {
       client.send(payload, (err) => {
         if (err) clients.delete(client);
       });
+    } else {
+      clients.delete(client);
     }
   }
 }
@@ -847,6 +854,10 @@ server.on('upgrade', (request, socket, head) => {
   }
   recordAuthSuccess(clientIp);
 
+  try {
+    socket.setNoDelay(true);
+  } catch (e) {}
+
   wss.handleUpgrade(request, socket, head, (ws) => {
     wss.emit('connection', ws, request);
   });
@@ -977,6 +988,7 @@ wss.on('connection', (ws, req) => {
             ws.send(JSON.stringify({ type: 'cleared' }));
           }
           if (ptyProcess) ptyProcess.write('\x0c');
+          lastBroadcastScreen = '';
           broadcastCleanScreen();
           break;
 

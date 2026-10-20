@@ -199,6 +199,48 @@ function renderStyledLine(line: string): React.ReactNode {
 }
 
 // ==========================================
+// 2.5 Line-Level Memoization & Pure Cache
+// ==========================================
+const styledLineCache = new Map<string, React.ReactNode>();
+const MAX_STYLED_LINE_CACHE = 500;
+
+function getCachedStyledLine(line: string): React.ReactNode {
+  let cached = styledLineCache.get(line);
+  if (cached === undefined) {
+    if (styledLineCache.size >= MAX_STYLED_LINE_CACHE) {
+      let count = 0;
+      for (const key of styledLineCache.keys()) {
+        styledLineCache.delete(key);
+        if (++count >= 100) break;
+      }
+    }
+    cached = renderStyledLine(line);
+    styledLineCache.set(line, cached);
+  }
+  return cached;
+}
+
+const MemoizedTerminalLine = React.memo(
+  function MemoizedTerminalLine({ line }: { line: string }) {
+    return (
+      <Text style={styles.terminalLine} selectable>
+        {getCachedStyledLine(line)}
+      </Text>
+    );
+  },
+  (prev, next) => prev.line === next.line
+);
+
+const LatencyPill = React.memo(function LatencyPill({ latency }: { latency: number | null }) {
+  if (latency === null) return null;
+  return (
+    <View style={styles.latencyPill}>
+      <Text style={styles.latencyText}>{latency}ms</Text>
+    </View>
+  );
+});
+
+// ==========================================
 // 2.8 Resilient Crash Interceptor (ErrorBoundary)
 // ==========================================
 interface ErrorBoundaryState {
@@ -304,6 +346,7 @@ export default function App() {
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const hostIndexRef = useRef(0);
   const isMountedRef = useRef(true);
+  const scrollRafRef = useRef<number | null>(null);
 
   // Track keyboard visibility and handle background touch to dismiss keyboard
   useEffect(() => {
@@ -345,7 +388,7 @@ export default function App() {
     } catch (e) {}
   };
 
-  // 30ms batching prevents React Native bridge flooding
+  // Ultra-responsive 16ms V-sync aligned batching prevents React Native bridge flooding
   const appendOutputChunk = useCallback((chunk: string) => {
     incomingBufferRef.current += chunk;
     if (!flushTimeoutRef.current) {
@@ -356,7 +399,7 @@ export default function App() {
           flushTimeoutRef.current = null;
           return next.length > 30000 ? next.slice(-30000) : next;
         });
-      }, 30);
+      }, 16);
     }
   }, []);
 
@@ -467,6 +510,10 @@ export default function App() {
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (flushTimeoutRef.current) clearTimeout(flushTimeoutRef.current);
+      if (scrollRafRef.current !== null) {
+        cancelAnimationFrame(scrollRafRef.current);
+        scrollRafRef.current = null;
+      }
     };
   }, [connect]);
 
@@ -551,8 +598,32 @@ export default function App() {
   };
 
   const parsedSegments = useMemo(() => {
+    if (screenLines.length > 0 || !terminalText) return [];
     return parseAnsi(terminalText);
-  }, [terminalText]);
+  }, [screenLines.length, terminalText]);
+
+  const renderedScreenLines = useMemo(() => {
+    return screenLines.map((line, idx) => (
+      <MemoizedTerminalLine key={idx} line={line} />
+    ));
+  }, [screenLines]);
+
+  const renderedParsedSegments = useMemo(() => {
+    return parsedSegments.map((seg, idx) => (
+      <Text
+        key={idx}
+        style={{
+          color: seg.color || '#e4e4e7',
+          fontWeight: seg.bold ? '700' : '400',
+          fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+          fontSize: 12,
+          lineHeight: 18,
+        }}
+      >
+        {seg.text}
+      </Text>
+    ));
+  }, [parsedSegments]);
 
   return (
     <ErrorBoundary>
@@ -588,11 +659,7 @@ export default function App() {
           </TouchableOpacity>
         </View>
 
-        {latency !== null && (
-          <View style={styles.latencyPill}>
-            <Text style={styles.latencyText}>{latency}ms</Text>
-          </View>
-        )}
+        <LatencyPill latency={latency} />
       </View>
 
       {/* ==================================================== */}
@@ -613,7 +680,13 @@ export default function App() {
               keyboardDismissMode="on-drag"
               onContentSizeChange={() => {
                 if (autoScroll) {
-                  scrollViewRef.current?.scrollToEnd({ animated: false });
+                  if (scrollRafRef.current !== null) {
+                    cancelAnimationFrame(scrollRafRef.current);
+                  }
+                  scrollRafRef.current = requestAnimationFrame(() => {
+                    scrollRafRef.current = null;
+                    scrollViewRef.current?.scrollToEnd({ animated: false });
+                  });
                 }
               }}
             >
@@ -628,26 +701,9 @@ export default function App() {
                     <Text style={styles.emptySub}>Tap anywhere to start typing...</Text>
                   </View>
                 ) : screenLines.length > 0 ? (
-                  screenLines.map((line, idx) => (
-                    <Text key={idx} style={styles.terminalLine} selectable>
-                      {renderStyledLine(line)}
-                    </Text>
-                  ))
+                  renderedScreenLines
                 ) : (
-                  parsedSegments.map((seg, idx) => (
-                    <Text
-                      key={idx}
-                      style={{
-                        color: seg.color || '#e4e4e7',
-                        fontWeight: seg.bold ? '700' : '400',
-                        fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-                        fontSize: 12,
-                        lineHeight: 18,
-                      }}
-                    >
-                      {seg.text}
-                    </Text>
-                  ))
+                  renderedParsedSegments
                 )}
               </TouchableOpacity>
             </ScrollView>
