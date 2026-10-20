@@ -362,14 +362,25 @@ function getCpuTemp() {
   }
 }
 
+let cachedBattery = null;
+let lastBatteryFetch = 0;
+
 function getBattery() {
+  const now = Date.now();
+  if (cachedBattery && now - lastBatteryFetch < 30000) {
+    return cachedBattery;
+  }
   try {
     const cap = parseInt(fs.readFileSync('/sys/class/power_supply/BAT0/capacity', 'utf8').trim(), 10);
     const status = fs.readFileSync('/sys/class/power_supply/BAT0/status', 'utf8').trim();
     const ac = fs.readFileSync('/sys/class/power_supply/AC0/online', 'utf8').trim() === '1';
-    return { level: cap, status, ac };
+    cachedBattery = { level: cap, status, ac };
+    lastBatteryFetch = now;
+    return cachedBattery;
   } catch (e) {
-    return { level: 100, status: 'AC Connected', ac: true };
+    cachedBattery = { level: 100, status: 'AC Connected', ac: true };
+    lastBatteryFetch = now;
+    return cachedBattery;
   }
 }
 
@@ -450,13 +461,22 @@ function getPerCoreCpu() {
   return results;
 }
 
+let cachedDisk = null;
+let lastDiskFetch = 0;
+
 function getDiskUsage() {
+  const now = Date.now();
+  if (cachedDisk && now - lastDiskFetch < 60000) {
+    return cachedDisk;
+  }
   try {
     const s = fs.statfsSync('/');
     const totalGb = Math.round((s.bsize * s.blocks) / (1024 ** 3));
     const usedGb = Math.round((s.bsize * (s.blocks - s.bfree)) / (1024 ** 3));
     const percent = totalGb > 0 ? Math.round((usedGb / totalGb) * 100) : 0;
-    return { totalGb, usedGb, percent };
+    cachedDisk = { totalGb, usedGb, percent };
+    lastDiskFetch = now;
+    return cachedDisk;
   } catch (e) {
     return { totalGb: 0, usedGb: 0, percent: 0 };
   }
