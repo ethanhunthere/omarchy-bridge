@@ -397,7 +397,7 @@ async function runPrimaryServerCheck() {
   logInfo('\n--- Suite 3: Primary Bridge Server (Port 19001) Live Verification ---');
 
   const PRIMARY_PORT = 19001;
-  const PRIMARY_TOKEN = 'omarchy-bridge-secure-key-2026';
+  const PRIMARY_TOKEN = require('./test-token');
   const PRIMARY_SESSION = 'omarchy-remote';
 
   // Check if primary tmux session exists

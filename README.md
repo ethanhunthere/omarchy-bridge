@@ -158,16 +158,21 @@ This guarantees that after any power cycle or remote reboot, the PC boots into L
 
 ## 📡 Protocol & REST API Reference
 
-All requests require either query parameter `?token=<TOKEN>` or header `Authorization: Bearer <TOKEN>`:
+REST requests require header `Authorization: Bearer <DEVICE_TOKEN>`. The master/admin key (from `server/.env`) also works and is required for device management. Legacy `?token=` still works for scripts:
 
 | Endpoint | Method | Description |
 | :--- | :--- | :--- |
 | `/health` | `GET` | Public status check and uptime (no auth required) |
+| `/api/pair` | `POST` | Exchange the 6-digit pairing code (printed in server log) for a device token |
+| `/api/devices` | `GET` | List paired devices (master key only) |
+| `/api/devices/revoke` | `POST` | Revoke a device by `deviceId` (master key only) |
 | `/api/telemetry` | `GET` | CPU %, CPU Temp, RAM, Battery, Uptime, DPMS & Stealth status |
 | `/api/screenshot` | `GET` | Live JPEG snapshot of the Wayland desktop (`grim`) |
 | `/api/action` | `POST` | Trigger system control (`dpms_toggle`, `stealth_toggle`, `lock`, `suspend`, `reboot`, `poweroff`, `send_wol`) |
 
-### WebSocket Protocol (`ws://<HOST>:19001?token=<TOKEN>`)
+### WebSocket Protocol (`ws://<HOST>:19001`)
+
+Authentication uses the WebSocket subprotocol header: `Sec-WebSocket-Protocol: omarchy-bridge.<DEVICE_TOKEN>` — the credential never appears in the URL. Legacy `?token=<TOKEN>` is accepted for automated scripts.
 
 - **Client to Server:**
   - `{ type: 'input', data: 'ls -la' }` — Dispatches command to shell prompt.
@@ -228,10 +233,14 @@ TOTAL TRACKS: 19 | PASSED: 19 | FAILED: 0 (100% Pass Rate)
 
 ## 🔒 Security Model
 
-1. **Pre-Shared Key Token:** All WebSocket connections and REST endpoints require a secret token (`?token=<TOKEN>` or `Authorization: Bearer <TOKEN>`).
-2. **Network Perimeter:** Bind the daemon to your Tailscale mesh IP (`100.x.y.z`) or use a local firewall rule to block untrusted external access.
-3. **Passwordless Polkit / Sudoers:** High-privilege power actions (`systemctl poweroff`, `reboot`, `suspend`) use non-blocking flags (`--no-ask-password` and `sudo -n`) scoped strictly to root binaries in `/etc/sudoers.d/omarchy-bridge` and `/etc/polkit-1/rules.d/50-omarchy-bridge.rules`.
-4. **Desktop Stealth Protection:** Activating Stealth Mode cuts the physical display while keeping the session securely locked.
+1. **Per-Device Tokens, No Shared Secret:** Every phone/tablet pairs once via a 6-digit one-time code (valid 5 minutes, printed in `journalctl --user -u omarchy-bridge`). The device receives a 256-bit random token; only its SHA-256 hash is stored (`~/.config/omarchy-bridge/devices.json`, mode `0600`). The app keeps its token in the iOS Keychain / Android Keystore.
+2. **Credential Never in URLs:** WebSocket auth travels in `Sec-WebSocket-Protocol`; REST uses `Authorization: Bearer`. Tokens are absent from server logs and URLs.
+3. **Revocation & Audit:** `GET /api/devices` + `POST /api/devices/revoke` (master key) drop access instantly; every pairing, auth failure, revocation, and connection is appended to `~/.config/omarchy-bridge/audit.log`.
+4. **Master Key Hygiene:** `server/.env` `AUTH_TOKEN` is a random 256-bit admin key generated per install (`setup/install-permissions.sh`). It is only needed for device management and scripts — never shipped in the app.
+5. **Timing-Safe Verification:** All token comparisons use constant-time equality; failed attempts per IP are rate-limited and locked out.
+6. **Network Perimeter:** Bind the daemon to your LAN and/or Tailscale mesh; never port-forward it to the public internet. Tailscale traffic is WireGuard-encrypted end to end.
+7. **Passwordless Polkit / Sudoers:** High-privilege power actions (`systemctl poweroff`, `reboot`, `suspend`) use non-blocking flags (`--no-ask-password` and `sudo -n`) scoped strictly to root binaries in `/etc/sudoers.d/omarchy-bridge` and `/etc/polkit-1/rules.d/50-omarchy-bridge.rules`.
+8. **Desktop Stealth Protection:** Activating Stealth Mode cuts the physical display while keeping the session securely locked.
 
 ---
 

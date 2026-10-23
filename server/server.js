@@ -13,6 +13,9 @@ const pty = require('node-pty');
 const { WebSocketServer, WebSocket } = require('ws');
 const { Terminal: HeadlessTerminal } = require('@xterm/headless');
 const { SerializeAddon } = require('@xterm/addon-serialize');
+const { startMdns, stopMdns } = require('./mdns');
+const { getTailscaleStatus } = require('./tailscale');
+const auth = require('./auth');
 require('dotenv').config();
 
 // ==========================================
@@ -70,7 +73,12 @@ if (!process.env.WAYLAND_DISPLAY) {
   } catch (e) {}
 }
 
-let AUTH_TOKEN = process.env.AUTH_TOKEN || 'omarchy-bridge-secure-key-2026';
+if (!process.env.AUTH_TOKEN) {
+  process.env.AUTH_TOKEN = crypto.randomBytes(32).toString('hex');
+  console.warn('[SECURITY] AUTH_TOKEN missing - generated ephemeral master key for this boot.');
+}
+
+auth.load();
 
 function safeParseUrl(urlStr, hostHeader) {
   try {
@@ -754,17 +762,86 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Pairing endpoint: unauthenticated by design, guarded by one-time code + rate limit.
+  if (reqUrl.pathname === '/api/pair' && req.method === 'POST') {
+    let body = '';
+    req.on('data', (c) => {
+      body += c;
+      if (body.length > 4096) req.destroy();
+    });
+    req.on('end', () => {
+      let payload = {};
+      try {
+        payload = JSON.parse(body || '{}');
+      } catch (e) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'invalid_json' }));
+        return;
+      }
+      const result = auth.redeemPairingCode(payload.code, payload.name, clientIp);
+      if (!result.ok) {
+        console.warn(`[SECURITY] Pairing rejected from ${clientIp}: ${result.error}`);
+        res.writeHead(result.error === 'rate_limited' ? 429 : 401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: result.error }));
+        return;
+      }
+      console.log(`[PAIR] Device paired: ${result.name} (${result.deviceId}) from ${clientIp}`);
+      console.log(`[PAIR] New one-time code: ${result.nextCode}`);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ token: result.token, deviceId: result.deviceId, name: result.name }));
+    });
+    return;
+  }
+
   const queryToken = reqUrl.searchParams.get('token');
   const authHeader = req.headers['authorization'];
   const token = queryToken || (authHeader ? authHeader.replace(/^Bearer\s+/i, '') : null);
+  const principal = auth.verifyToken(token);
 
-  if (!timingSafeTokenCheck(token, AUTH_TOKEN)) {
+  if (!principal) {
     recordAuthFailure(clientIp);
+    auth.audit('http_auth_failed', { ip: clientIp, path: reqUrl.pathname });
     res.writeHead(401, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Unauthorized' }));
     return;
   }
   recordAuthSuccess(clientIp);
+
+  // Device management requires the master key (never a paired device token).
+  if (reqUrl.pathname === '/api/devices' && req.method === 'GET') {
+    if (!principal.master) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Master key required' }));
+      return;
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ devices: auth.listDevices() }));
+    return;
+  }
+
+  if (reqUrl.pathname === '/api/devices/revoke' && req.method === 'POST') {
+    if (!principal.master) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Master key required' }));
+      return;
+    }
+    let body = '';
+    req.on('data', (c) => {
+      body += c;
+      if (body.length > 4096) req.destroy();
+    });
+    req.on('end', () => {
+      let payload = {};
+      try {
+        payload = JSON.parse(body || '{}');
+      } catch (e) {}
+      const revoked = auth.revokeDevice(String(payload.deviceId || ''));
+      console.log(`[SECURITY] Device revoke ${revoked ? 'ok' : 'not_found'}: ${payload.deviceId}`);
+      res.writeHead(revoked ? 200 : 404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ revoked }));
+    });
+    return;
+  }
 
   if (reqUrl.pathname === '/api/telemetry') {
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -839,7 +916,15 @@ server.on('error', (err) => {
 // ==========================================
 // 8. WebSocket Upgrade & Client Protocol
 // ==========================================
-const wss = new WebSocketServer({ noServer: true });
+const wss = new WebSocketServer({
+  noServer: true,
+  // Echo back the first requested subprotocol; the token itself is validated
+  // in the upgrade handler before we ever get here.
+  handleProtocols: (protocols) => {
+    for (const p of protocols) return p;
+    return false;
+  },
+});
 
 server.on('upgrade', (request, socket, head) => {
   socket.on('error', () => {
@@ -861,24 +946,43 @@ server.on('upgrade', (request, socket, head) => {
     return;
   }
 
+  // Preferred auth: Sec-WebSocket-Protocol: omarchy-bridge.<device-token>
+  // Keeps the credential out of URLs/logs. Legacy ?token= / Bearer still accepted
+  // (admin + automated tests use the master key).
+  const protocolHeader = request.headers['sec-websocket-protocol'];
+  let protocolToken = null;
+  if (typeof protocolHeader === 'string') {
+    const match = protocolHeader
+      .split(',')
+      .map((p) => p.trim())
+      .find((p) => p.startsWith('omarchy-bridge.'));
+    if (match) protocolToken = match.slice('omarchy-bridge.'.length);
+  }
+
   const queryToken = reqUrl.searchParams.get('token');
   const authHeader = request.headers['authorization'];
   const headerToken = authHeader ? authHeader.replace(/^Bearer\s+/i, '') : null;
-  const token = queryToken || headerToken;
+  const token = protocolToken || queryToken || headerToken;
+  const principal = auth.verifyToken(token);
 
-  if (!timingSafeTokenCheck(token, AUTH_TOKEN)) {
+  if (!principal) {
     recordAuthFailure(clientIp);
+    auth.audit('ws_auth_failed', { ip: clientIp });
     socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
     socket.destroy();
     return;
   }
   recordAuthSuccess(clientIp);
+  if (!principal.master) {
+    auth.audit('ws_auth_ok', { ip: clientIp, deviceId: principal.id, name: principal.name });
+  }
 
   try {
     socket.setNoDelay(true);
   } catch (e) {}
 
   wss.handleUpgrade(request, socket, head, (ws) => {
+    ws.isMasterKey = !!principal.master;
     wss.emit('connection', ws, request);
   });
 });
@@ -915,6 +1019,7 @@ wss.on('connection', (ws, req) => {
       lines: getCleanScreenLines(120),
       history: initialHistory,
       telemetry: getLightTelemetry(),
+      remote: getTailscaleStatus(),
     }),
     (err) => {
       if (err) cleanupClient();
@@ -1029,14 +1134,40 @@ wss.on('connection', (ws, req) => {
 // ==========================================
 server.listen(PORT, HOST, () => {
   const lanIp = getPrimaryLanIp();
+  const tailscale = getTailscaleStatus();
+  const pairingCode = auth.newPairingCode();
+  const pairedCount = auth.deviceCount();
   console.log(`\n============================================================`);
   console.log(` Omarchy Ultra-Fast Bridge Daemon Active on Port ${PORT}`);
   console.log(` Session: ${TMUX_SESSION} | Shell: ${USER_SHELL} -l`);
-  console.log(` LAN Endpoint: ws://${lanIp}:${PORT}?token=${AUTH_TOKEN}`);
+  console.log(` LAN Endpoint:    ws://${lanIp}:${PORT}`);
+  console.log(` mDNS Endpoint:   ws://omarchy-bridge.local:${PORT}`);
+  if (tailscale.available || tailscale.magicDns) {
+    const remoteHost = tailscale.magicDns || tailscale.ip;
+    console.log(` Tailscale:       ws://${remoteHost}:${PORT}`);
+  } else {
+    console.log(` Tailscale:       not detected (install/enable tailscale for remote access)`);
+  }
+  console.log(` Paired devices:  ${pairedCount}`);
+  console.log(`------------------------------------------------------------`);
+  console.log(` PAIRING CODE:    ${pairingCode}`);
+  console.log(`   Enter this code in the app within 5 minutes.`);
+  console.log(`   A new code appears in this log after each successful pairing.`);
+  console.log(`   View anytime:  journalctl --user -u omarchy-bridge | grep PAIRING`);
   console.log(`============================================================\n`);
+  startMdns(PORT);
+
+  // Keep a fresh pairing code available at all times without restarts.
+  setInterval(() => {
+    if (!auth.activePairingCode()) {
+      const code = auth.newPairingCode();
+      console.log(`[PAIR] New one-time code: ${code} (valid 5 min)`);
+    }
+  }, 60000).unref();
 });
 
 function cleanup() {
+  stopMdns(PORT);
   if (keepAwakeProcess) {
     try {
       keepAwakeProcess.kill();

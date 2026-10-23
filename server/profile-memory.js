@@ -14,7 +14,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = 19005; // Dedicated port to avoid conflict with running systemd daemon on 19001
-const TOKEN = 'omarchy-bridge-secure-key-2026';
+const TOKEN = require('./test-token');
 const MAX_SCROLLBACK_BYTES = 512 * 1024; // 524,288 bytes
 const TEST_TMUX_SESSION = 'omarchy-profile-60s';
 const DURATION_SEC = 60;

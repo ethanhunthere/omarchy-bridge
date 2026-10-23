@@ -7,10 +7,25 @@
     "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.omarchy.clibridge"
+      "bundleIdentifier": "com.omarchy.clibridge",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocalNetworkUsageDescription": "Omarchy Bridge connects to your PC on the local network to stream the terminal and control power.",
+        "NSBonjourServices": [
+          "_omarchy-bridge._tcp"
+        ]
+      }
     },
     "android": {
       "package": "com.omarchy.clibridge"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "5fae2e7c-3d8d-4469-a799-81c23717a4c2"
+      }
+    },
+    "plugins": [
+      "expo-secure-store"
+    ]
   }
 }

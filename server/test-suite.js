@@ -7,7 +7,7 @@ const { WebSocket } = require('ws');
 const http = require('http');
 
 const PORT = 19001;
-const TOKEN = 'omarchy-bridge-secure-key-2026';
+const TOKEN = require('./test-token');
 const WS_URL = `ws://127.0.0.1:${PORT}?token=${TOKEN}`;
 
 let ws;

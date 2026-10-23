@@ -5,6 +5,26 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 echo "=== Installing Omarchy Bridge Permissions & System Settings ==="
 
+# 0. Master key hygiene: server/.env keeps a unique random AUTH_TOKEN per install.
+ENV_FILE="$SCRIPT_DIR/../server/.env"
+if [ ! -f "$ENV_FILE" ]; then
+    echo "[+] Creating server/.env with a random master key..."
+    cat > "$ENV_FILE" <<EOF
+PORT=19001
+HOST=0.0.0.0
+AUTH_TOKEN=$(openssl rand -hex 32)
+TMUX_SESSION=omarchy-remote
+SHELL_CMD=/usr/bin/fish
+WORK_DIR=$HOME
+BUFFER_MAX_BYTES=524288
+EOF
+elif grep -q "omarchy-bridge-secure-key-2026" "$ENV_FILE"; then
+    echo "[+] Replacing default AUTH_TOKEN with a random master key..."
+    NEW_TOKEN=$(openssl rand -hex 32)
+    sed -i "s/^AUTH_TOKEN=.*/AUTH_TOKEN=$NEW_TOKEN/" "$ENV_FILE"
+fi
+chmod 600 "$ENV_FILE" 2>/dev/null || true
+
 # 1. Sudoers rule
 echo "[+] Installing /etc/sudoers.d/omarchy-bridge..."
 sudo install -m 0440 "$SCRIPT_DIR/omarchy-bridge.sudoers" /etc/sudoers.d/omarchy-bridge
@@ -31,7 +51,11 @@ else
     echo "[!] Tailscale package not installed. Installing via pacman..."
     sudo pacman -S --noconfirm tailscale
     sudo systemctl enable --now tailscaled
-    echo "[!] Run 'sudo tailscale up' to register your machine."
 fi
+
+# Let the user-level bridge daemon read 'tailscale status' (MagicDNS name / remote IP)
+sudo tailscale set --operator="${SUDO_USER:-$USER}" 2>/dev/null || true
+echo "[!] Run 'sudo tailscale up' once, then log in with same account on phone."
+echo "[!] Remote endpoint appears in: journalctl --user -u omarchy-bridge -f"
 
 echo "=== Permissions & System Services Configured Successfully ==="

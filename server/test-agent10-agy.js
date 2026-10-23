@@ -7,7 +7,7 @@ const path = require('path');
 const assert = require('assert');
 const { execSync } = require('child_process');
 
-const TOKEN = 'omarchy-bridge-secure-key-2026';
+const TOKEN = require('./test-token');
 const WS_URL = `ws://127.0.0.1:19001?token=${encodeURIComponent(TOKEN)}`;
 
 let total = 0;

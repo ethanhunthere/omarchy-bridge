@@ -10,7 +10,7 @@ const { execSync } = require('child_process');
 const fs = require('fs');
 
 const PORT = 19001;
-const TOKEN = 'omarchy-bridge-secure-key-2026';
+const TOKEN = require('./test-token');
 const WS_URL = `ws://127.0.0.1:${PORT}?token=${TOKEN}`;
 const HEALTH_URL = `http://127.0.0.1:${PORT}/health`;
 const TMUX_SESSION = 'omarchy-remote';

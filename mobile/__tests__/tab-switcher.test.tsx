@@ -31,6 +31,34 @@ const constantsMock = {
 mock.module('expo-constants', () => constantsMock);
 mock.module(import.meta.resolve('expo-constants').replace('file://', ''), () => constantsMock);
 
+const fileSystemMock = {
+  File: class {
+    exists = false;
+    textSync() {
+      return '';
+    }
+    write() {}
+  },
+  Paths: { document: {} },
+};
+mock.module('expo-file-system', () => fileSystemMock);
+mock.module(import.meta.resolve('expo-file-system').replace('file://', ''), () => fileSystemMock);
+
+const secureStoreValues: Record<string, string> = {
+  'omarchy-bridge-device-token': 'test-device-token-0123456789abcdef',
+};
+const secureStoreMock = {
+  getItemAsync: async (key: string) => secureStoreValues[key] ?? null,
+  setItemAsync: async (key: string, value: string) => {
+    secureStoreValues[key] = value;
+  },
+  deleteItemAsync: async (key: string) => {
+    delete secureStoreValues[key];
+  },
+};
+mock.module('expo-secure-store', () => secureStoreMock);
+mock.module(import.meta.resolve('expo-secure-store').replace('file://', ''), () => secureStoreMock);
+
 const mockComponent = (name: string) => {
   const comp = (props: any) => React.createElement(name, props, props?.children);
   comp.displayName = name;

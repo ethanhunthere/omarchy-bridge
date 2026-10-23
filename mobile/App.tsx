@@ -15,21 +15,99 @@ import {
   Keyboard,
 } from 'react-native';
 import Constants from 'expo-constants';
+import { File, Paths } from 'expo-file-system';
 import * as Haptics from 'expo-haptics';
+import * as SecureStore from 'expo-secure-store';
 
 // ==========================================
 // 1. Config & Host Discovery
 // ==========================================
-const FIXED_AUTH_TOKEN = 'omarchy-bridge-secure-key-2026';
 const BRIDGE_PORT = 19001;
+const DEFAULT_BRIDGE_HOST = 'omarchy-bridge.local';
+const BRIDGE_HOST_FILENAME = 'omarchy-bridge-host.txt';
+const REMOTE_HOST_FILENAME = 'omarchy-bridge-remote.txt';
+const DEVICE_TOKEN_KEY = 'omarchy-bridge-device-token';
+
+async function readDeviceToken(): Promise<string> {
+  try {
+    return (await SecureStore.getItemAsync(DEVICE_TOKEN_KEY)) || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+async function persistDeviceToken(token: string): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(DEVICE_TOKEN_KEY, token);
+  } catch (e) {}
+}
+
+async function clearDeviceToken(): Promise<void> {
+  try {
+    await SecureStore.deleteItemAsync(DEVICE_TOKEN_KEY);
+  } catch (e) {}
+}
 
 interface LegacyConstants {
   manifest?: { debuggerHost?: string };
   manifest2?: { extra?: { expoGo?: { debuggerHost?: string } } };
 }
 
-function resolveCandidateHosts(): string[] {
+function normalizeBridgeHost(raw: string): string {
+  let host = (raw || '').trim();
+  host = host.replace(/^wss?:\/\//i, '').replace(/^https?:\/\//i, '');
+  host = host.split('/')[0];
+  host = host.replace(/:\d+$/, '');
+  return host;
+}
+
+function readSavedBridgeHost(): string {
+  try {
+    const file = new File(Paths.document, BRIDGE_HOST_FILENAME);
+    if (!file.exists) return '';
+    return normalizeBridgeHost(file.textSync());
+  } catch (e) {
+    return '';
+  }
+}
+
+function persistBridgeHost(host: string): void {
+  try {
+    const file = new File(Paths.document, BRIDGE_HOST_FILENAME);
+    file.write(host);
+  } catch (e) {}
+}
+
+function readSavedRemoteHost(): string {
+  try {
+    const file = new File(Paths.document, REMOTE_HOST_FILENAME);
+    if (!file.exists) return '';
+    return normalizeBridgeHost(file.textSync());
+  } catch (e) {
+    return '';
+  }
+}
+
+function persistRemoteHost(host: string): void {
+  try {
+    const file = new File(Paths.document, REMOTE_HOST_FILENAME);
+    file.write(host);
+  } catch (e) {}
+}
+
+function resolveCandidateHosts(savedHost = '', remoteHost = ''): string[] {
   const hosts: string[] = [];
+  const add = (candidate?: string | null) => {
+    if (!candidate) return;
+    const host = normalizeBridgeHost(candidate);
+    if (host && !hosts.includes(host)) hosts.push(host);
+  };
+
+  add(savedHost);
+
+  const extraHost = (Constants.expoConfig?.extra as { bridgeHost?: string } | undefined)?.bridgeHost;
+  add(extraHost);
+
   const legacyConstants = Constants as unknown as LegacyConstants;
   const hostUri =
     Constants.expoConfig?.hostUri ||
@@ -39,13 +117,12 @@ function resolveCandidateHosts(): string[] {
   if (hostUri) {
     const detectedIp = hostUri.split(':')[0];
     if (detectedIp && detectedIp !== 'localhost' && detectedIp !== '127.0.0.1') {
-      hosts.push(detectedIp);
+      add(detectedIp);
     }
   }
 
-  if (!hosts.includes('192.168.1.6')) {
-    hosts.push('192.168.1.6');
-  }
+  add(DEFAULT_BRIDGE_HOST);
+  add(remoteHost);
   return hosts;
 }
 
@@ -231,12 +308,37 @@ const MemoizedTerminalLine = React.memo(
   (prev, next) => prev.line === next.line
 );
 
-const LatencyPill = React.memo(function LatencyPill({ latency }: { latency: number | null }) {
-  if (latency === null) return null;
+const ConnectionPill = React.memo(function ConnectionPill({
+  latency,
+  status,
+  paired,
+  onPress,
+}: {
+  latency: number | null;
+  status: 'connected' | 'connecting' | 'disconnected';
+  paired: boolean;
+  onPress: () => void;
+}) {
+  const isOffline = status === 'disconnected';
+  const label = !paired
+    ? 'PAIR'
+    : status === 'connected'
+      ? latency !== null
+        ? `${latency}ms`
+        : 'LINK'
+      : status === 'connecting'
+        ? 'LINKING'
+        : 'OFFLINE';
+
   return (
-    <View style={styles.latencyPill}>
-      <Text style={styles.latencyText}>{latency}ms</Text>
-    </View>
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      style={[styles.latencyPill, isOffline && styles.latencyPillOffline]}
+      testID="connection-pill"
+    >
+      <Text style={[styles.latencyText, isOffline && styles.latencyTextOffline]}>{label}</Text>
+    </TouchableOpacity>
   );
 });
 
@@ -292,8 +394,21 @@ class ErrorBoundary extends React.Component<{ children: React.ReactNode }, Error
 // 3. Main Industrial Minimalist Component
 // ==========================================
 export default function App() {
-  const candidateHosts = useMemo(() => resolveCandidateHosts(), []);
   const [activeTab, setActiveTab] = useState<'terminal' | 'power'>('terminal');
+  const [savedHost, setSavedHost] = useState<string>(() => readSavedBridgeHost());
+  const savedHostRef = useRef<string>(savedHost);
+  const [savedRemoteHost, setSavedRemoteHost] = useState<string>(() => readSavedRemoteHost());
+  const savedRemoteHostRef = useRef<string>(savedRemoteHost);
+  const [hostModalVisible, setHostModalVisible] = useState(false);
+  const [hostInput, setHostInput] = useState<string>(savedHost || DEFAULT_BRIDGE_HOST);
+
+  // Device pairing (per-device token in OS keychain; nothing shared is shipped)
+  const [deviceToken, setDeviceToken] = useState<string>('');
+  const deviceTokenRef = useRef<string>('');
+  const [pairCodeInput, setPairCodeInput] = useState('');
+  const [deviceNameInput, setDeviceNameInput] = useState('iPhone');
+  const [pairing, setPairing] = useState(false);
+  const [pairError, setPairError] = useState('');
 
   // Connection State
   const [status, setStatus] = useState<'connected' | 'connecting' | 'disconnected'>('connecting');
@@ -405,6 +520,7 @@ export default function App() {
 
   const connect = useCallback(() => {
     if (!isMountedRef.current) return;
+    if (!deviceTokenRef.current) return;
     if (
       socketRef.current &&
       (socketRef.current.readyState === WebSocket.OPEN ||
@@ -413,13 +529,16 @@ export default function App() {
       return;
     }
 
-    const currentHost = candidateHosts[hostIndexRef.current % candidateHosts.length] || '192.168.1.6';
-    const targetUrl = `ws://${currentHost}:${BRIDGE_PORT}?token=${encodeURIComponent(FIXED_AUTH_TOKEN)}`;
+    const candidateHosts = resolveCandidateHosts(savedHostRef.current, savedRemoteHostRef.current);
+    const currentHost = candidateHosts[hostIndexRef.current % candidateHosts.length] || DEFAULT_BRIDGE_HOST;
+    // Credential travels in the WebSocket subprotocol header, never in the URL.
+    const targetUrl = `ws://${currentHost}:${BRIDGE_PORT}`;
+    const protocols = [`omarchy-bridge.${deviceTokenRef.current}`];
 
     setStatus('connecting');
 
     try {
-      const ws = new WebSocket(targetUrl);
+      const ws = new WebSocket(targetUrl, protocols);
       socketRef.current = ws;
 
       ws.onopen = () => {
@@ -450,6 +569,14 @@ export default function App() {
             if (Array.isArray(msg.lines)) setScreenLines(msg.lines);
             if (msg.history) setTerminalText(msg.history);
             if (msg.telemetry) setTelemetry(msg.telemetry);
+            if (msg.remote) {
+              const remoteHost = normalizeBridgeHost(msg.remote.magicDns || msg.remote.ip || '');
+              if (remoteHost && remoteHost !== savedRemoteHostRef.current) {
+                persistRemoteHost(remoteHost);
+                savedRemoteHostRef.current = remoteHost;
+                setSavedRemoteHost(remoteHost);
+              }
+            }
           } else if (msg.type === 'output') {
             appendOutputChunk(msg.data);
           } else if (msg.type === 'telemetry') {
@@ -498,11 +625,139 @@ export default function App() {
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       reconnectTimeoutRef.current = setTimeout(connect, 2000);
     }
-  }, [candidateHosts, appendOutputChunk]);
+  }, [appendOutputChunk]);
+
+  const openHostEditor = useCallback(() => {
+    setHostInput(savedHostRef.current || DEFAULT_BRIDGE_HOST);
+    setPairError('');
+    setHostModalVisible(true);
+  }, []);
+
+  const applyBridgeHost = useCallback(() => {
+    const host = normalizeBridgeHost(hostInput);
+    if (!host) return;
+
+    persistBridgeHost(host);
+    savedHostRef.current = host;
+    setSavedHost(host);
+    setHostModalVisible(false);
+    hostIndexRef.current = 0;
+    Keyboard.dismiss();
+
+    const ws = socketRef.current;
+    socketRef.current = null;
+    if (ws) {
+      ws.onopen = null;
+      ws.onmessage = null;
+      ws.onerror = null;
+      ws.onclose = null;
+      try {
+        ws.close();
+      } catch (e) {}
+    }
+
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+
+    setStatus('connecting');
+    setLatency(null);
+    connect();
+  }, [connect, hostInput]);
+
+  const pairDevice = useCallback(async () => {
+    const code = pairCodeInput.trim();
+    const name = deviceNameInput.trim() || 'iPhone';
+    if (!/^\d{6}$/.test(code)) {
+      setPairError('Enter the 6-digit code from the server log');
+      return;
+    }
+    setPairing(true);
+    setPairError('');
+
+    const hosts = resolveCandidateHosts(savedHostRef.current, savedRemoteHostRef.current);
+    let sawRejection = false;
+    for (const host of hosts) {
+      try {
+        const res = await fetch(`http://${host}:${BRIDGE_PORT}/api/pair`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code, name }),
+        });
+        if (res.status === 429) {
+          setPairError('Too many attempts. Wait a minute and try again.');
+          setPairing(false);
+          return;
+        }
+        if (!res.ok) {
+          sawRejection = true;
+          continue;
+        }
+        const data = await res.json();
+        if (data.token) {
+          await persistDeviceToken(data.token);
+          deviceTokenRef.current = data.token;
+          setDeviceToken(data.token);
+          setPairCodeInput('');
+          setPairError('');
+          setPairing(false);
+          hostIndexRef.current = 0;
+          setHostModalVisible(false);
+          connect();
+          return;
+        }
+        sawRejection = true;
+      } catch (e) {}
+    }
+
+    setPairing(false);
+    setPairError(
+      sawRejection
+        ? 'Wrong or expired code. Check the server log for the current code.'
+        : 'Could not reach the bridge. Check Wi-Fi and host.'
+    );
+  }, [connect, pairCodeInput, deviceNameInput]);
+
+  const unpairDevice = useCallback(() => {
+    clearDeviceToken();
+    deviceTokenRef.current = '';
+    setDeviceToken('');
+
+    const ws = socketRef.current;
+    socketRef.current = null;
+    if (ws) {
+      ws.onopen = null;
+      ws.onmessage = null;
+      ws.onerror = null;
+      ws.onclose = null;
+      try {
+        ws.close();
+      } catch (e) {}
+    }
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+    if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+    setStatus('disconnected');
+    setLatency(null);
+  }, []);
 
   useEffect(() => {
     isMountedRef.current = true;
-    connect();
+    (async () => {
+      const token = await readDeviceToken();
+      if (!isMountedRef.current) return;
+      if (token) {
+        deviceTokenRef.current = token;
+        setDeviceToken(token);
+        connect();
+      } else {
+        setStatus('disconnected');
+      }
+    })();
 
     return () => {
       isMountedRef.current = false;
@@ -659,7 +914,7 @@ export default function App() {
           </TouchableOpacity>
         </View>
 
-        <LatencyPill latency={latency} />
+        <ConnectionPill latency={latency} status={status} paired={!!deviceToken} onPress={openHostEditor} />
       </View>
 
       {/* ==================================================== */}
@@ -914,6 +1169,23 @@ export default function App() {
             <Text style={styles.cardDesc}>Instantly secures Hyprland desktop session and locks 1Password vault.</Text>
           </TouchableOpacity>
 
+          {/* Bridge Host & Auto-Discovery */}
+          <View style={styles.powerCard} testID="bridge-host-card">
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardLabel}>BRIDGE HOST</Text>
+              <Text style={styles.cmdBadge}>{savedHost || 'auto (mDNS)'}</Text>
+            </View>
+            <Text style={styles.cardDesc}>
+              {status === 'connected'
+                ? 'Connected. Host is saved on this device for instant reconnects.'
+                : 'Auto-discovers your PC as omarchy-bridge.local on the same Wi-Fi. Override with the PC IP if discovery is blocked.'}
+            </Text>
+            {savedRemoteHost ? <Text style={styles.cardDesc}>Remote: {savedRemoteHost}</Text> : null}
+            <TouchableOpacity style={styles.hostEditBtn} onPress={openHostEditor} activeOpacity={0.8}>
+              <Text style={styles.hostEditText}>CHANGE HOST</Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Wi-Fi Profile Safety Notice */}
           <View style={styles.safetyNoticeCard}>
             <Text style={styles.safetyNoticeTitle}>REMOTE WI-FI PROFILE</Text>
@@ -923,6 +1195,102 @@ export default function App() {
           </View>
         </ScrollView>
       )}
+
+      {/* Bridge Host Editor */}
+      <Modal visible={hostModalVisible} transparent animationType="fade" testID="host-modal">
+        <View style={styles.modalBackdrop}>
+          <View style={styles.dialogCard}>
+            <Text style={styles.dialogTitle}>Bridge Host</Text>
+            <Text style={styles.dialogMessage}>
+              Leave as "{DEFAULT_BRIDGE_HOST}" to discover your PC automatically over Wi-Fi. If mDNS is blocked on your
+              network, enter the PC's LAN IP address instead.
+            </Text>
+            <TextInput
+              style={styles.hostInput}
+              value={hostInput}
+              onChangeText={setHostInput}
+              placeholder={DEFAULT_BRIDGE_HOST}
+              placeholderTextColor="#52525b"
+              autoCapitalize="none"
+              autoCorrect={false}
+              spellCheck={false}
+              keyboardAppearance="dark"
+              returnKeyType="done"
+              onSubmitEditing={applyBridgeHost}
+              testID="host-input"
+            />
+            <Text style={styles.hostHint}>Saved on device. Reconnects immediately on save.</Text>
+
+            <View style={styles.modalDivider} />
+
+            {deviceToken ? (
+              <View>
+                <Text style={styles.dialogTitle}>Device Paired</Text>
+                <Text style={styles.dialogMessage}>
+                  This device holds its own key in the OS keychain. Revoke it anytime from the PC.
+                </Text>
+                <TouchableOpacity style={styles.dialogBtnSecondary} testID="unpair-btn" onPress={unpairDevice}>
+                  <Text style={styles.dialogBtnSecondaryText}>Forget This Device</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View>
+                <Text style={styles.dialogTitle}>Pair This Device</Text>
+                <Text style={styles.dialogMessage}>
+                  On the PC run: journalctl --user -u omarchy-bridge | grep PAIRING. Enter the 6-digit code below. It
+                  expires after 5 minutes.
+                </Text>
+                <TextInput
+                  style={styles.hostInput}
+                  value={pairCodeInput}
+                  onChangeText={setPairCodeInput}
+                  placeholder="6-digit code"
+                  placeholderTextColor="#52525b"
+                  keyboardType="number-pad"
+                  maxLength={6}
+                  keyboardAppearance="dark"
+                  testID="pair-code-input"
+                />
+                <TextInput
+                  style={styles.hostInput}
+                  value={deviceNameInput}
+                  onChangeText={setDeviceNameInput}
+                  placeholder="Device name"
+                  placeholderTextColor="#52525b"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  maxLength={40}
+                  keyboardAppearance="dark"
+                  testID="pair-name-input"
+                />
+                {pairError ? <Text style={styles.pairError}>{pairError}</Text> : null}
+                <TouchableOpacity
+                  style={styles.dialogBtnPrimary}
+                  testID="pair-btn"
+                  onPress={pairDevice}
+                  disabled={pairing}
+                >
+                  <Text style={styles.dialogBtnPrimaryText}>{pairing ? 'Pairing...' : 'Pair Device'}</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            <View style={styles.dialogActions}>
+              <TouchableOpacity
+                style={styles.dialogBtnSecondary}
+                testID="host-cancel-btn"
+                onPress={() => setHostModalVisible(false)}
+              >
+                <Text style={styles.dialogBtnSecondaryText}>Close</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.dialogBtnPrimary} testID="host-save-btn" onPress={applyBridgeHost}>
+                <Text style={styles.dialogBtnPrimaryText}>Save & Reconnect</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Industrial Minimal Confirmation Dialog */}
       <Modal visible={confirmModal.visible} transparent animationType="fade" testID="confirmation-modal">
@@ -1006,6 +1374,12 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '600',
     color: '#8e93a4',
+  },
+  latencyPillOffline: {
+    borderColor: 'rgba(248, 113, 113, 0.35)',
+  },
+  latencyTextOffline: {
+    color: '#f87171',
   },
 
   // Centered Glassy Segmented Tabs
@@ -1493,6 +1867,51 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     color: '#0a0b0d',
+  },
+  hostEditBtn: {
+    marginTop: 10,
+    paddingVertical: 8,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: '#2c3042',
+    backgroundColor: '#161820',
+    alignItems: 'center',
+  },
+  hostEditText: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#cbd5e1',
+    letterSpacing: 0.8,
+  },
+  hostInput: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 14,
+    color: '#ffffff',
+    backgroundColor: '#161820',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: '#262936',
+  },
+  hostHint: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 11,
+    color: '#717688',
+    marginTop: 8,
+    marginBottom: 16,
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: '#262936',
+    marginBottom: 16,
+  },
+  pairError: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 11,
+    color: '#ef4444',
+    marginBottom: 12,
   },
 
   // Resilient Crash Interceptor Styles

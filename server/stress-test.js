@@ -1,6 +1,6 @@
 /**
  * Automated PTY Stress & Backpressure Benchmark Suite for Omarchy Bridge
- * Target: ws://127.0.0.1:19001?token=omarchy-bridge-secure-key-2026
+ * Target: ws://127.0.0.1:19001?token=<AUTH_TOKEN>
  * 
  * Verifies:
  *  1. 5,000 commands/chunks flooded through PTY
@@ -14,7 +14,7 @@ const { WebSocket } = require('ws');
 const http = require('http');
 
 const PORT = 19001;
-const TOKEN = 'omarchy-bridge-secure-key-2026';
+const TOKEN = require('./test-token');
 const WS_URL = `ws://127.0.0.1:${PORT}?token=${TOKEN}`;
 const MEMORY_URL = `http://127.0.0.1:${PORT}/api/memory?token=${TOKEN}`;
 const HEALTH_URL = `http://127.0.0.1:${PORT}/health`;

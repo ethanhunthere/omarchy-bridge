@@ -18,7 +18,7 @@ const { WebSocket } = require('ws');
 
 const PRIMARY_MAC = process.env.PRIMARY_MAC || '14:13:33:a8:af:df';
 const PORT = parseInt(process.env.PORT || '19001', 10);
-const AUTH_TOKEN = process.env.AUTH_TOKEN || 'omarchy-bridge-secure-key-2026';
+const AUTH_TOKEN = require('./test-token');
 const WS_URL = `ws://127.0.0.1:${PORT}?token=${AUTH_TOKEN}`;
 
 const results = [];

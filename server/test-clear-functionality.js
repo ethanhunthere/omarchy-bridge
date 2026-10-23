@@ -16,7 +16,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = 19001;
-const TOKEN = 'omarchy-bridge-secure-key-2026';
+const TOKEN = require('./test-token');
 const WS_URL = `ws://127.0.0.1:${PORT}?token=${TOKEN}`;
 const MEMORY_URL = `http://127.0.0.1:${PORT}/api/memory?token=${TOKEN}`;
 const SCREEN_URL = `http://127.0.0.1:${PORT}/api/screen?token=${TOKEN}`;
