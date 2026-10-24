@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { memo } from 'react';
 import { Modal, Platform, Text, TouchableOpacity, View } from 'react-native';
 import { useThemedStyles } from '../theme/ThemeProvider';
 import { ThemeTokens } from '../theme/palettes';
 import { ConfirmModalState } from '../hooks/useBridge';
 
-export default function ConfirmModal({
+export default memo(function ConfirmModal({
   state,
   onCancel,
   onExecute,
@@ -56,7 +56,7 @@ export default function ConfirmModal({
       </View>
     </Modal>
   );
-}
+});
 
 const makeStyles = (t: ThemeTokens) =>
   ({

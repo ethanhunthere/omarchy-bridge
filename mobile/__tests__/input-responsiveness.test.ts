@@ -56,9 +56,9 @@ describe('Agent 3: TextInput & Typing Responsiveness Test Suite', () => {
   });
 
   describe('Requirement 2: Focus state changes border highlight to accent focus color with prompt ❯ highlighting in green', () => {
-    test('onFocus and onBlur manage isInputFocused state', () => {
-      expect(code.includes('setIsInputFocused(true)')).toBe(true);
-      expect(code.includes('setIsInputFocused(false)')).toBe(true);
+    test('onFocus and onBlur manage the focused state', () => {
+      expect(code.includes('setFocused(true)')).toBe(true);
+      expect(code.includes('setFocused(false)')).toBe(true);
     });
 
     test('border highlight transitions to focus token (#3b82f6) when focused', () => {
@@ -72,19 +72,22 @@ describe('Agent 3: TextInput & Typing Responsiveness Test Suite', () => {
     test('prompt ❯ highlights in emerald green (#22c55e) when focused', () => {
       const promptFocused = code.match(/promptCharFocused:\s*\{[^}]*color:\s*t\.success/s);
       expect(promptFocused).not.toBeNull();
-      expect(code.includes('isInputFocused && styles.promptCharFocused')).toBe(true);
+      expect(code.includes('focused && styles.promptCharFocused')).toBe(true);
       const palette = fs.readFileSync(path.resolve(__dirname, '../src/theme/palettes.ts'), 'utf-8');
       expect(palette.includes("success: '#22c55e'")).toBe(true);
     });
   });
 
-  describe('Requirement 3: Typing characters updates inputCommand immediately with zero lag', () => {
-    test('TextInput value and onChangeText directly bound to inputCommand and setInputCommand', () => {
+  describe('Requirement 3: Typing characters updates the input immediately with zero lag', () => {
+    test('TextInput is a leaf component with direct value/onChangeText binding (no debounce)', () => {
       const textInputMatch = code.match(/<TextInput\s+ref=\{inputRef\}[\s\S]*?\/>/);
       expect(textInputMatch).not.toBeNull();
       const block = textInputMatch![0];
-      expect(block.includes('value={inputCommand}')).toBe(true);
-      expect(block.includes('onChangeText={setInputCommand}')).toBe(true);
+      expect(block.includes('value={value}')).toBe(true);
+      expect(block.includes('onChangeText={handleChange}')).toBe(true);
+      // The change handler must update state synchronously, never via timers.
+      expect(code.includes('const handleChange = (text: string) => {')).toBe(true);
+      expect(code.includes('setValue(text);')).toBe(true);
     });
 
     test('simulated keystroke dispatch executes with sub-millisecond latency (< 1ms)', () => {
@@ -102,9 +105,9 @@ describe('Agent 3: TextInput & Typing Responsiveness Test Suite', () => {
     });
   });
 
-  describe("Requirement 4: When inputCommand is not empty, clear '✕' button appears and clears text on tap", () => {
-    test('clear button renders conditionally when inputCommand.length > 0', () => {
-      expect(code.includes('inputCommand.length > 0')).toBe(true);
+  describe("Requirement 4: When input has text, clear '✕' button appears and clears it on tap", () => {
+    test('clear button renders conditionally when text is present', () => {
+      expect(code.includes('hasText &&')).toBe(true);
       expect(code.includes('clearInputBtn')).toBe(true);
     });
 
@@ -113,8 +116,9 @@ describe('Agent 3: TextInput & Typing Responsiveness Test Suite', () => {
       expect(code.includes('>✕<')).toBe(true);
     });
 
-    test("clear button onPress calls setInputCommand('')", () => {
-      expect(code.includes("setInputCommand('')")).toBe(true);
+    test('clear button resets the controlled value to empty', () => {
+      expect(code.includes("setValue('')")).toBe(true);
+      expect(code.includes('setHasText(false)')).toBe(true);
     });
   });
 

@@ -101,6 +101,10 @@ const rnMock = {
     OS: 'android',
     select: (obj: any) => obj.android || obj.default,
   },
+  AppState: {
+    currentState: 'active',
+    addEventListener: mock(() => ({ remove: mock(() => {}) })),
+  },
   Modal: mockComponent('Modal'),
   Dimensions: {
     get: mock(() => ({ width: 400, height: 800 })),
@@ -189,6 +193,13 @@ function getSegmentedButtons(root: any) {
   return { terminalBtn, powerBtn };
 }
 
+// Both tabs stay mounted; the active one is the wrapper without display:'none'.
+function isTabVisible(root: any, testID: string): boolean {
+  const node = root.findByProps({ testID });
+  const flat = (Array.isArray(node.props.style) ? node.props.style : [node.props.style]).flat();
+  return !flat.some((s: any) => s && s.display === 'none');
+}
+
 describe('mobile/App.tsx Segmented Control Buttons Audit', () => {
   let renderer: any;
 
@@ -235,10 +246,9 @@ describe('mobile/App.tsx Segmented Control Buttons Audit', () => {
     expect(texts).toContain('clear');
     expect(texts).toContain('SCROLL: ON');
 
-    // Verify POWER view components are NOT rendered
-    expect(texts).not.toContain('CPU LOAD');
-    expect(texts).not.toContain('SYSTEM CONTROLS');
-    expect(texts).not.toContain('systemctl suspend');
+    // Verify POWER view is mounted but hidden (no remount on tab switch)
+    expect(isTabVisible(renderer.root, 'tab-power')).toBe(false);
+    expect(isTabVisible(renderer.root, 'tab-terminal')).toBe(true);
   });
 
   test('Suite 2: Tapping POWER sets activeTab to power and renders HUD metrics + power cards', () => {
@@ -283,12 +293,9 @@ describe('mobile/App.tsx Segmented Control Buttons Audit', () => {
     expect(texts).not.toContain('SEND WAKE-ON-LAN');
     expect(texts.some((t) => t.includes('REBOOT'))).toBe(false);
 
-    // 6. Verify Terminal View & Keycap Ribbon are unmounted / not rendered
-    expect(texts).not.toContain('[omarchy-remote ready]');
-    expect(texts).not.toContain('Ctrl+C');
-    expect(texts).not.toContain('Ctrl+D');
-    expect(texts).not.toContain('SCROLL: ON');
-    expect(texts).not.toContain('Type command or prompt...');
+    // 6. Verify Terminal View & Keycap Ribbon are hidden
+    expect(isTabVisible(renderer.root, 'tab-terminal')).toBe(false);
+    expect(isTabVisible(renderer.root, 'tab-power')).toBe(true);
   });
 
   test('Suite 3: Tapping TERMINAL sets activeTab to terminal and restores terminal view', () => {
@@ -324,10 +331,9 @@ describe('mobile/App.tsx Segmented Control Buttons Audit', () => {
     expect(texts).toContain('Enter ↵');
     expect(texts).toContain('agy');
 
-    // 4. Verify Power view is unmounted
-    expect(texts).not.toContain('CPU LOAD');
-    expect(texts).not.toContain('MACHINE POWER');
-    expect(texts).not.toContain('SHUT DOWN PC');
+    // 4. Verify Power view is hidden (mounted but not displayed)
+    expect(isTabVisible(renderer.root, 'tab-power')).toBe(false);
+    expect(isTabVisible(renderer.root, 'tab-terminal')).toBe(true);
   });
 
   test('Suite 4: Tab switching is instantaneous (< 10ms per switch)', () => {

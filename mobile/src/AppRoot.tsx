@@ -29,12 +29,21 @@ function ThemedApp() {
         onPressPill={bridge.openHostEditor}
       />
 
+      {/* Both tabs stay mounted: switching is a visibility toggle, so the
+          terminal keeps its scroll position and input text across tabs. */}
       <View style={styles.flexOne}>
-        {bridge.activeTab === 'terminal' ? (
+        <View
+          style={[styles.flexOne, bridge.activeTab !== 'terminal' && styles.hidden]}
+          testID="tab-terminal"
+        >
           <TerminalView bridge={bridge} />
-        ) : (
+        </View>
+        <View
+          style={[styles.flexOne, bridge.activeTab !== 'power' && styles.hidden]}
+          testID="tab-power"
+        >
           <PowerView bridge={bridge} />
-        )}
+        </View>
       </View>
 
       <SettingsModal
@@ -86,5 +95,8 @@ const makeStyles = (t: ThemeTokens) =>
     },
     flexOne: {
       flex: 1,
+    },
+    hidden: {
+      display: 'none',
     },
   }) as const;

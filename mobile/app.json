@@ -31,6 +31,9 @@
         "projectId": "5fae2e7c-3d8d-4469-a799-81c23717a4c2"
       }
     },
+    "experiments": {
+      "reactCompiler": true
+    },
     "plugins": [
       "expo-secure-store",
       [

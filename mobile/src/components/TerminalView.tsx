@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { memo, useCallback, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -10,8 +10,8 @@ import {
 } from 'react-native';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider';
 import { ThemeTokens } from '../theme/palettes';
-import { parseAnsi } from '../lib/ansi';
-import { BridgeController } from '../hooks/useBridge';
+import { parseAnsi, StyledSegment } from '../lib/ansi';
+import { BridgeController, ConnectionStatus } from '../hooks/useBridge';
 
 type Styles = ReturnType<typeof makeStyles>;
 
@@ -111,73 +111,267 @@ function getCachedStyledLine(themeId: string, line: string, styles: Styles): Rea
   return cached;
 }
 
-const MemoizedTerminalLine = React.memo(
-  function MemoizedTerminalLine({ line, themeId, styles }: { line: string; themeId: string; styles: Styles }) {
-    return (
-      <Text style={styles.terminalLine} selectable>
-        {getCachedStyledLine(themeId, line, styles)}
-      </Text>
-    );
-  },
-  (prev, next) => prev.line === next.line && prev.themeId === next.themeId
-);
+const TerminalLine = memo(function TerminalLine({
+  line,
+  themeId,
+  styles,
+}: {
+  line: string;
+  themeId: string;
+  styles: Styles;
+}) {
+  return (
+    <Text style={styles.terminalLine} selectable>
+      {getCachedStyledLine(themeId, line, styles)}
+    </Text>
+  );
+});
 
 // ==========================================
-// Terminal tab: viewport, keycap ribbon, input bar
+// Terminal body — memoized so typing never re-renders the output.
+// ==========================================
+const TerminalBody = memo(function TerminalBody({
+  screenLines,
+  terminalText,
+  autoScroll,
+  onPress,
+  onContentSizeChange,
+  scrollViewRef,
+}: {
+  screenLines: string[];
+  terminalText: string;
+  autoScroll: boolean;
+  onPress: () => void;
+  onContentSizeChange: () => void;
+  scrollViewRef: React.RefObject<ScrollView | null>;
+}) {
+  const styles = useThemedStyles(makeStyles);
+  const { theme, themeId } = useTheme();
+
+  const parsedSegments: StyledSegment[] = useMemo(() => {
+    if (screenLines.length > 0 || !terminalText) return [];
+    return parseAnsi(terminalText, theme.terminalText, theme.ansi);
+  }, [screenLines.length, terminalText, theme]);
+
+  const renderedScreenLines = useMemo(
+    () => screenLines.map((line, idx) => <TerminalLine key={idx} line={line} themeId={themeId} styles={styles} />),
+    [screenLines, themeId, styles]
+  );
+
+  const renderedParsedSegments = useMemo(
+    () =>
+      parsedSegments.map((seg, idx) => (
+        <Text
+          key={idx}
+          style={{
+            color: seg.color || theme.terminalText,
+            fontWeight: seg.bold ? '700' : '400',
+            fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+            fontSize: 12,
+            lineHeight: 18,
+          }}
+        >
+          {seg.text}
+        </Text>
+      )),
+    [parsedSegments, theme]
+  );
+
+  return (
+    <ScrollView
+      ref={scrollViewRef}
+      style={styles.terminalViewport}
+      contentContainerStyle={styles.terminalContent}
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+      onContentSizeChange={() => {
+        if (autoScroll) onContentSizeChange();
+      }}
+    >
+      <TouchableOpacity activeOpacity={1} onPress={onPress} style={styles.touchableTerminal}>
+        {screenLines.length === 0 && !terminalText ? (
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyPrompt}>[omarchy-remote ready]</Text>
+            <Text style={styles.emptySub}>Tap anywhere to start typing...</Text>
+          </View>
+        ) : screenLines.length > 0 ? (
+          renderedScreenLines
+        ) : (
+          renderedParsedSegments
+        )}
+      </TouchableOpacity>
+    </ScrollView>
+  );
+});
+
+// ==========================================
+// Keycap ribbon — memoized: never re-renders while typing.
+// ==========================================
+const KeycapRibbon = memo(function KeycapRibbon({
+  autoScroll,
+  onToggleAutoScroll,
+  onSignal,
+  onHistory,
+  onClear,
+  onPrefill,
+}: {
+  autoScroll: boolean;
+  onToggleAutoScroll: () => void;
+  onSignal: (signal: string) => void;
+  onHistory: (direction: 'up' | 'down') => void;
+  onClear: () => void;
+  onPrefill: () => void;
+}) {
+  const styles = useThemedStyles(makeStyles);
+
+  const keycap = (label: string, onPress: () => void, extraStyle?: object, extraTextStyle?: object) => (
+    <TouchableOpacity
+      style={[styles.keycap, extraStyle]}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+    >
+      <Text style={[styles.keycapText, extraTextStyle]}>{label}</Text>
+    </TouchableOpacity>
+  );
+
+  return (
+    <View style={styles.keycapRibbon}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.ribbonScroll}
+        keyboardShouldPersistTaps="handled"
+      >
+        {keycap('Ctrl+C', () => onSignal('ctrl_c'), styles.keycapCtrlC, styles.keycapCtrlCText)}
+        {keycap('Ctrl+D', () => onSignal('ctrl_d'), styles.keycapCtrlD, styles.keycapCtrlDText)}
+        {keycap('ESC', () => onSignal('esc'))}
+        {keycap('TAB', () => onSignal('tab'))}
+        {keycap('▲', () => onHistory('up'))}
+        {keycap('▼', () => onHistory('down'))}
+        {keycap('Enter ↵', () => onSignal('enter'), styles.keycapEnter, styles.keycapEnterText)}
+        {keycap('agy', onPrefill, styles.keycapTool, styles.keycapToolText)}
+        {keycap('clear', onClear)}
+        {keycap(autoScroll ? 'SCROLL: ON' : 'SCROLL: FREE', onToggleAutoScroll, autoScroll ? styles.keycapAutoScroll : undefined)}
+      </ScrollView>
+    </View>
+  );
+});
+
+// ==========================================
+// Input bar — owns its own text state: keystrokes re-render only this bar.
+// ==========================================
+export interface TerminalInputHandle {
+  setValue: (value: string) => void;
+  focus: () => void;
+}
+
+const TerminalInput = React.forwardRef<TerminalInputHandle, {
+  status: ConnectionStatus;
+  onSend: (command: string) => void;
+  onFocused: () => void;
+}>(function TerminalInput({ status, onSend, onFocused }, ref) {
+  const styles = useThemedStyles(makeStyles);
+  const { theme } = useTheme();
+  const inputRef = useRef<TextInput>(null);
+  const [value, setValue] = useState('');
+  const [hasText, setHasText] = useState(false);
+  const [focused, setFocused] = useState(false);
+
+  useImperativeHandle(ref, () => ({
+    setValue: (next: string) => {
+      setValue(next);
+      setHasText(next.length > 0);
+    },
+    focus: () => inputRef.current?.focus(),
+  }));
+
+  const handleChange = (text: string) => {
+    setValue(text);
+    setHasText(text.length > 0);
+  };
+
+  const handleSend = () => {
+    onSend(value);
+    if (value.length > 0) {
+      setValue('');
+      setHasText(false);
+    }
+  };
+
+  return (
+    <View style={[styles.inputBar, focused && styles.inputBarFocused]}>
+      <Text style={[styles.promptChar, focused && styles.promptCharFocused]}>❯</Text>
+      <TextInput
+        ref={inputRef}
+        style={[styles.inputField, focused && styles.inputFieldFocused]}
+        value={value}
+        onChangeText={handleChange}
+        onFocus={() => {
+          setFocused(true);
+          onFocused();
+        }}
+        onBlur={() => setFocused(false)}
+        placeholder="Type command or prompt..."
+        placeholderTextColor={theme.textMuted}
+        autoCapitalize="none"
+        autoCorrect={false}
+        spellCheck={false}
+        keyboardAppearance="dark"
+        returnKeyType="send"
+        onSubmitEditing={handleSend}
+        textContentType="none"
+        autoComplete="off"
+      />
+      {hasText && (
+        <TouchableOpacity
+          style={styles.clearInputBtn}
+          onPress={() => {
+            setValue('');
+            setHasText(false);
+          }}
+          accessibilityRole="button"
+          accessibilityLabel="Clear input"
+        >
+          <Text style={styles.clearInputText}>✕</Text>
+        </TouchableOpacity>
+      )}
+      <TouchableOpacity
+        style={[styles.sendBtn, status === 'connected' ? styles.sendBtnActive : styles.sendBtnDisabled]}
+        onPress={handleSend}
+        accessibilityRole="button"
+        accessibilityLabel={hasText ? 'Send command' : 'Send enter'}
+      >
+        <Text style={[styles.sendBtnText, status !== 'connected' && styles.sendBtnTextDisabled]}>
+          {hasText ? 'SEND' : '↵'}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+});
+
+// ==========================================
+// Terminal tab composition
 // ==========================================
 export default function TerminalView({ bridge }: { bridge: BridgeController }) {
   const styles = useThemedStyles(makeStyles);
-  const { theme, themeId } = useTheme();
+  const inputHandleRef = useRef<TerminalInputHandle>(null);
   const {
     screenLines,
     terminalText,
     autoScroll,
     setAutoScroll,
-    inputCommand,
-    setInputCommand,
-    isInputFocused,
-    setIsInputFocused,
+    status,
     handleTerminalPress,
-    handleHistoryNav,
     sendCommand,
     sendSignal,
     clearScreen,
-    status,
-    inputRef,
+    nextHistoryValue,
     scrollViewRef,
     scrollRafRef,
   } = bridge;
 
-  const parsedSegments = useMemo(() => {
-    if (screenLines.length > 0 || !terminalText) return [];
-    return parseAnsi(terminalText, theme.terminalText, theme.ansi);
-  }, [screenLines.length, terminalText, theme]);
-
-  const renderedScreenLines = useMemo(() => {
-    return screenLines.map((line, idx) => (
-      <MemoizedTerminalLine key={idx} line={line} themeId={themeId} styles={styles} />
-    ));
-  }, [screenLines, themeId, styles]);
-
-  const renderedParsedSegments = useMemo(() => {
-    return parsedSegments.map((seg, idx) => (
-      <Text
-        key={idx}
-        style={{
-          color: seg.color || theme.terminalText,
-          fontWeight: seg.bold ? '700' : '400',
-          fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-          fontSize: 12,
-          lineHeight: 18,
-        }}
-      >
-        {seg.text}
-      </Text>
-    ));
-  }, [parsedSegments, theme]);
-
-  const onTerminalContentChange = useCallback(() => {
-    if (!autoScroll) return;
+  const onContentSizeChange = useCallback(() => {
     if (scrollRafRef.current !== null) {
       cancelAnimationFrame(scrollRafRef.current);
     }
@@ -185,13 +379,26 @@ export default function TerminalView({ bridge }: { bridge: BridgeController }) {
       scrollRafRef.current = null;
       scrollViewRef.current?.scrollToEnd({ animated: false });
     });
-  }, [autoScroll, scrollRafRef, scrollViewRef]);
+  }, [scrollRafRef, scrollViewRef]);
 
-  const keycap = (label: string, onPress: () => void, extraStyle?: object, extraTextStyle?: object) => (
-    <TouchableOpacity style={[styles.keycap, extraStyle]} onPress={onPress} accessibilityRole="button" accessibilityLabel={label}>
-      <Text style={[styles.keycapText, extraTextStyle]}>{label}</Text>
-    </TouchableOpacity>
+  const onToggleAutoScroll = useCallback(() => setAutoScroll((p) => !p), [setAutoScroll]);
+  const onHistory = useCallback(
+    (direction: 'up' | 'down') => {
+      const next = nextHistoryValue(direction);
+      if (next !== null) inputHandleRef.current?.setValue(next);
+      inputHandleRef.current?.focus();
+    },
+    [nextHistoryValue]
   );
+  const onPrefill = useCallback(() => {
+    inputHandleRef.current?.setValue('agy');
+    inputHandleRef.current?.focus();
+  }, []);
+  const onInputFocused = useCallback(() => {
+    if (autoScroll) {
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 150);
+    }
+  }, [autoScroll, scrollViewRef]);
 
   return (
     <KeyboardAvoidingView
@@ -200,99 +407,23 @@ export default function TerminalView({ bridge }: { bridge: BridgeController }) {
       keyboardVerticalOffset={0}
     >
       <View style={styles.flexOne}>
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.terminalViewport}
-          contentContainerStyle={styles.terminalContent}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-          onContentSizeChange={onTerminalContentChange}
-        >
-          <TouchableOpacity activeOpacity={1} onPress={handleTerminalPress} style={styles.touchableTerminal}>
-            {screenLines.length === 0 && !terminalText ? (
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyPrompt}>[omarchy-remote ready]</Text>
-                <Text style={styles.emptySub}>Tap anywhere to start typing...</Text>
-              </View>
-            ) : screenLines.length > 0 ? (
-              renderedScreenLines
-            ) : (
-              renderedParsedSegments
-            )}
-          </TouchableOpacity>
-        </ScrollView>
-
-        {/* Keycap ribbon (pinned above the keyboard) */}
-        <View style={styles.keycapRibbon}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.ribbonScroll}
-            keyboardShouldPersistTaps="handled"
-          >
-            {keycap('Ctrl+C', () => sendSignal('ctrl_c'), styles.keycapCtrlC, styles.keycapCtrlCText)}
-            {keycap('Ctrl+D', () => sendSignal('ctrl_d'), styles.keycapCtrlD, styles.keycapCtrlDText)}
-            {keycap('ESC', () => sendSignal('esc'))}
-            {keycap('TAB', () => sendSignal('tab'))}
-            {keycap('▲', () => handleHistoryNav('up'))}
-            {keycap('▼', () => handleHistoryNav('down'))}
-            {keycap('Enter ↵', () => sendSignal('enter'), styles.keycapEnter, styles.keycapEnterText)}
-            {keycap('agy', () => {
-              setInputCommand('agy');
-              inputRef.current?.focus();
-            }, styles.keycapTool, styles.keycapToolText)}
-            {keycap('clear', clearScreen)}
-            {keycap(autoScroll ? 'SCROLL: ON' : 'SCROLL: FREE', () => setAutoScroll((p) => !p), autoScroll ? styles.keycapAutoScroll : undefined)}
-          </ScrollView>
-        </View>
-
-        {/* Floating input bar */}
-        <View style={[styles.inputBar, isInputFocused && styles.inputBarFocused]}>
-          <Text style={[styles.promptChar, isInputFocused && styles.promptCharFocused]}>❯</Text>
-          <TextInput
-            ref={inputRef}
-            style={[styles.inputField, isInputFocused && styles.inputFieldFocused]}
-            value={inputCommand}
-            onChangeText={setInputCommand}
-            onFocus={() => {
-              setIsInputFocused(true);
-              if (autoScroll) {
-                setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 150);
-              }
-            }}
-            onBlur={() => setIsInputFocused(false)}
-            placeholder="Type command or prompt..."
-            placeholderTextColor={theme.textMuted}
-            autoCapitalize="none"
-            autoCorrect={false}
-            spellCheck={false}
-            keyboardAppearance="dark"
-            returnKeyType="send"
-            onSubmitEditing={() => sendCommand()}
-            textContentType="none"
-            autoComplete="off"
-          />
-          {inputCommand.length > 0 && (
-            <TouchableOpacity
-              style={styles.clearInputBtn}
-              onPress={() => setInputCommand('')}
-              accessibilityRole="button"
-              accessibilityLabel="Clear input"
-            >
-              <Text style={styles.clearInputText}>✕</Text>
-            </TouchableOpacity>
-          )}
-          <TouchableOpacity
-            style={[styles.sendBtn, status === 'connected' ? styles.sendBtnActive : styles.sendBtnDisabled]}
-            onPress={() => sendCommand()}
-            accessibilityRole="button"
-            accessibilityLabel={inputCommand.trim() ? 'Send command' : 'Send enter'}
-          >
-            <Text style={[styles.sendBtnText, status !== 'connected' && styles.sendBtnTextDisabled]}>
-              {inputCommand.trim() ? 'SEND' : '↵'}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <TerminalBody
+          screenLines={screenLines}
+          terminalText={terminalText}
+          autoScroll={autoScroll}
+          onPress={handleTerminalPress}
+          onContentSizeChange={onContentSizeChange}
+          scrollViewRef={scrollViewRef}
+        />
+        <KeycapRibbon
+          autoScroll={autoScroll}
+          onToggleAutoScroll={onToggleAutoScroll}
+          onSignal={sendSignal}
+          onHistory={onHistory}
+          onClear={clearScreen}
+          onPrefill={onPrefill}
+        />
+        <TerminalInput ref={inputHandleRef} status={status} onSend={sendCommand} onFocused={onInputFocused} />
       </View>
     </KeyboardAvoidingView>
   );
@@ -386,8 +517,6 @@ const makeStyles = (t: ThemeTokens) =>
       color: t.textMuted,
       marginTop: 6,
     },
-
-    // Keycap ribbon
     keycapRibbon: {
       backgroundColor: t.surface,
       borderTopWidth: 1,
@@ -457,8 +586,6 @@ const makeStyles = (t: ThemeTokens) =>
     keycapAutoScroll: {
       borderColor: t.focus,
     },
-
-    // Input bar
     inputBar: {
       flexDirection: 'row',
       alignItems: 'center',

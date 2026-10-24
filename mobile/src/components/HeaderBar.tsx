@@ -41,7 +41,7 @@ const ConnectionPill = memo(function ConnectionPill({
   );
 });
 
-export default function HeaderBar({
+export default memo(function HeaderBar({
   activeTab,
   onSelectTab,
   latency,
@@ -83,7 +83,7 @@ export default function HeaderBar({
       <ConnectionPill latency={latency} status={status} paired={paired} onPress={onPressPill} />
     </View>
   );
-}
+});
 
 const makeStyles = (t: ThemeTokens) =>
   ({

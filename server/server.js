@@ -240,15 +240,24 @@ function broadcastCleanScreen() {
   const serialized = JSON.stringify(lines);
   if (serialized === lastBroadcastScreen) return;
   lastBroadcastScreen = serialized;
-  const payload = JSON.stringify({ type: 'screen', lines });
+  // Encode once per tick: ws reuses this buffer for every socket instead of
+  // UTF-8 encoding the string per client.
+  const frame = Buffer.from(JSON.stringify({ type: 'screen', lines }), 'utf8');
   for (const client of clients) {
-    if (client.readyState === WebSocket.OPEN) {
-      client.send(payload, (err) => {
-        if (err) clients.delete(client);
-      });
-    } else {
+    if (client.readyState !== WebSocket.OPEN) {
       clients.delete(client);
+      continue;
     }
+    // Slow phone: skip frames while it drains, then resync with the next full frame.
+    if (client.bufferedAmount > 64 * 1024) {
+      client.needsFull = true;
+      continue;
+    }
+    if (client.needsFull && client.bufferedAmount > 16 * 1024) continue;
+    client.needsFull = false;
+    client.send(frame, { binary: false }, (err) => {
+      if (err) clients.delete(client);
+    });
   }
 }
 

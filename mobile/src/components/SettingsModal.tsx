@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { memo, useRef } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -31,7 +31,7 @@ export interface SettingsModalProps {
   onSelectTheme: (id: string) => void;
 }
 
-export default function SettingsModal(props: SettingsModalProps) {
+export default memo(function SettingsModal(props: SettingsModalProps) {
   const styles = useThemedStyles(makeStyles);
   const { theme } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
@@ -211,7 +211,7 @@ export default function SettingsModal(props: SettingsModalProps) {
       </KeyboardAvoidingView>
     </Modal>
   );
-}
+});
 
 const makeStyles = (t: ThemeTokens) =>
   ({

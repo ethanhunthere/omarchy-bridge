@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { Dimensions, Keyboard, Platform, ScrollView, TextInput } from 'react-native';
+import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
+import { AppState, Dimensions, Keyboard, Platform, ScrollView, TextInput } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import {
   BRIDGE_PORT,
@@ -69,8 +69,6 @@ export function useBridge() {
   // Terminal state
   const [screenLines, setScreenLines] = useState<string[]>([]);
   const [terminalText, setTerminalText] = useState<string>('');
-  const [inputCommand, setInputCommand] = useState('');
-  const [isInputFocused, setIsInputFocused] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -99,9 +97,31 @@ export function useBridge() {
   const scrollRafRef = useRef<number | null>(null);
   const historyRef = useRef<string[]>([]);
   const historyIndexRef = useRef(-1);
+  const reconnectAttemptRef = useRef(0);
+  const appStateRef = useRef(AppState.currentState);
+  const pendingScreenRef = useRef<string[] | null>(null);
+  const screenFrameTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   historyRef.current = history;
   historyIndexRef.current = historyIndex;
+
+  // Coalesce high-frequency screen frames into at most one commit per 16ms,
+  // inside a transition so typing/focus work always wins the scheduler.
+  // Leading edge applies instantly (latency 0 for single frames); trailing
+  // commits collapse bursts.
+  const scheduleScreenLines = useCallback((lines: string[]) => {
+    if (!screenFrameTimerRef.current) {
+      setScreenLines(lines);
+      screenFrameTimerRef.current = setTimeout(() => {
+        screenFrameTimerRef.current = null;
+        const next = pendingScreenRef.current;
+        pendingScreenRef.current = null;
+        if (next) startTransition(() => setScreenLines(next));
+      }, 16);
+      return;
+    }
+    pendingScreenRef.current = lines;
+  }, []);
 
   // Keyboard visibility feeds tap-to-focus terminal behavior
   useEffect(() => {
@@ -136,16 +156,17 @@ export function useBridge() {
   }, []);
 
   const handleTerminalPress = useCallback(() => {
-    if (isKeyboardVisible || isInputFocused) {
+    if (isKeyboardVisible) {
       Keyboard.dismiss();
     } else {
       inputRef.current?.focus();
     }
-  }, [isKeyboardVisible, isInputFocused]);
+  }, [isKeyboardVisible]);
 
   const selectTab = useCallback(
     (tab: 'terminal' | 'power') => {
       triggerHaptic('light');
+      if (tab !== 'terminal') Keyboard.dismiss();
       setActiveTab(tab);
     },
     [triggerHaptic]
@@ -192,6 +213,7 @@ export function useBridge() {
       ws.onopen = () => {
         if (!isMountedRef.current) return;
         setStatus('connected');
+        reconnectAttemptRef.current = 0;
         triggerHaptic('light');
 
         const { width, height } = Dimensions.get('window');
@@ -204,7 +226,7 @@ export function useBridge() {
           if (ws.readyState === WebSocket.OPEN) {
             ws.send(JSON.stringify({ type: 'ping', time: Date.now() }));
           }
-        }, 3000);
+        }, 8000);
       };
 
       ws.onmessage = (event) => {
@@ -212,9 +234,9 @@ export function useBridge() {
         try {
           const msg = JSON.parse(event.data);
           if (msg.type === 'screen' && Array.isArray(msg.lines)) {
-            setScreenLines(msg.lines);
+            scheduleScreenLines(msg.lines);
           } else if (msg.type === 'init') {
-            if (Array.isArray(msg.lines)) setScreenLines(msg.lines);
+            if (Array.isArray(msg.lines)) scheduleScreenLines(msg.lines);
             if (msg.history) setTerminalText(msg.history);
             if (msg.telemetry) setTelemetry(msg.telemetry);
             if (msg.remote) {
@@ -246,6 +268,11 @@ export function useBridge() {
               clearTimeout(flushTimeoutRef.current);
               flushTimeoutRef.current = null;
             }
+            pendingScreenRef.current = null;
+            if (screenFrameTimerRef.current) {
+              clearTimeout(screenFrameTimerRef.current);
+              screenFrameTimerRef.current = null;
+            }
             setScreenLines([]);
             setTerminalText('');
           }
@@ -263,17 +290,24 @@ export function useBridge() {
         setStatus('disconnected');
         setLatency(null);
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+        if (appStateRef.current !== 'active') return;
 
         if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+        const attempt = reconnectAttemptRef.current++;
+        const base = Math.min(500 * Math.pow(2, attempt), 30000);
+        const delay = Math.round(base * (0.8 + Math.random() * 0.4));
         reconnectTimeoutRef.current = setTimeout(() => {
-          if (isMountedRef.current) connect();
-        }, 2000);
+          reconnectTimeoutRef.current = null;
+          if (isMountedRef.current && appStateRef.current === 'active') connect();
+        }, delay);
       };
     } catch (err) {
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = setTimeout(connect, 2000);
+      reconnectTimeoutRef.current = setTimeout(() => {
+        if (appStateRef.current === 'active') connect();
+      }, 1000);
     }
-  }, [appendOutputChunk, triggerHaptic]);
+  }, [appendOutputChunk, scheduleScreenLines, triggerHaptic]);
 
   const teardownSocket = useCallback(() => {
     const ws = socketRef.current;
@@ -293,6 +327,27 @@ export function useBridge() {
     }
     if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
   }, []);
+
+  // Pause the tunnel while backgrounded, reconnect immediately on foreground.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      appStateRef.current = state;
+      if (state === 'active') {
+        if (!deviceTokenRef.current) return;
+        if (reconnectTimeoutRef.current) {
+          clearTimeout(reconnectTimeoutRef.current);
+          reconnectTimeoutRef.current = null;
+        }
+        reconnectAttemptRef.current = 0;
+        connect();
+      } else if (state === 'background') {
+        teardownSocket();
+        setStatus('disconnected');
+        setLatency(null);
+      }
+    });
+    return () => sub.remove();
+  }, [connect, teardownSocket]);
 
   const openHostEditor = useCallback(() => {
     setHostInput(savedHostRef.current || DEFAULT_BRIDGE_HOST);
@@ -419,6 +474,7 @@ export function useBridge() {
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
       if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (flushTimeoutRef.current) clearTimeout(flushTimeoutRef.current);
+      if (screenFrameTimerRef.current) clearTimeout(screenFrameTimerRef.current);
       if (scrollRafRef.current !== null) {
         cancelAnimationFrame(scrollRafRef.current);
         scrollRafRef.current = null;
@@ -426,7 +482,7 @@ export function useBridge() {
     };
   }, [connect]);
 
-  const sendCommand = (cmd: string = inputCommand) => {
+  const sendCommand = useCallback((cmd: string) => {
     try {
       triggerHaptic('light');
       if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
@@ -436,7 +492,6 @@ export function useBridge() {
           socketRef.current.send(JSON.stringify({ type: 'input', data: cmd }));
           setHistory((prev) => [cmd, ...prev.filter((h) => h !== cmd)].slice(0, 40));
           setHistoryIndex(-1);
-          setInputCommand('');
         }
       } else {
         connect();
@@ -444,9 +499,9 @@ export function useBridge() {
     } catch (e) {
       console.warn('[BRIDGE] sendCommand error intercepted:', e);
     }
-  };
+  }, [connect, triggerHaptic]);
 
-  const sendSignal = (signal: string) => {
+  const sendSignal = useCallback((signal: string) => {
     try {
       triggerHaptic('medium');
       if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
@@ -455,7 +510,7 @@ export function useBridge() {
     } catch (e) {
       console.warn('[BRIDGE] sendSignal error intercepted:', e);
     }
-  };
+  }, [triggerHaptic]);
 
   const dispatchAction = (action: string, payload: Record<string, unknown> = {}) => {
     try {
@@ -468,13 +523,18 @@ export function useBridge() {
     }
   };
 
-  const clearScreen = () => {
+  const clearScreen = useCallback(() => {
     try {
       triggerHaptic('light');
       incomingBufferRef.current = '';
       if (flushTimeoutRef.current) {
         clearTimeout(flushTimeoutRef.current);
         flushTimeoutRef.current = null;
+      }
+      pendingScreenRef.current = null;
+      if (screenFrameTimerRef.current) {
+        clearTimeout(screenFrameTimerRef.current);
+        screenFrameTimerRef.current = null;
       }
       setScreenLines([]);
       setTerminalText('');
@@ -484,29 +544,31 @@ export function useBridge() {
     } catch (e) {
       console.warn('[BRIDGE] clearScreen error intercepted:', e);
     }
-  };
+  }, [triggerHaptic]);
 
-  const promptConfirmation = (title: string, description: string, action: string, isDanger: boolean = false) => {
-    triggerHaptic('warning');
-    setConfirmModal({ visible: true, title, description, action, isDanger });
-  };
+  const promptConfirmation = useCallback(
+    (title: string, description: string, action: string, isDanger: boolean = false) => {
+      triggerHaptic('warning');
+      setConfirmModal({ visible: true, title, description, action, isDanger });
+    },
+    [triggerHaptic]
+  );
 
-  const handleHistoryNav = (direction: 'up' | 'down') => {
+  // Returns the next history entry; the input bar applies it imperatively.
+  const nextHistoryValue = useCallback((direction: 'up' | 'down'): string | null => {
     triggerHaptic('light');
     const items = historyRef.current;
-    if (items.length === 0) return;
+    if (items.length === 0) return null;
     const current = historyIndexRef.current;
     if (direction === 'up') {
       const nextIdx = Math.min(current + 1, items.length - 1);
       setHistoryIndex(nextIdx);
-      setInputCommand(items[nextIdx] || '');
-    } else {
-      const nextIdx = Math.max(current - 1, -1);
-      setHistoryIndex(nextIdx);
-      setInputCommand(nextIdx === -1 ? '' : items[nextIdx]);
+      return items[nextIdx] || '';
     }
-    inputRef.current?.focus();
-  };
+    const nextIdx = Math.max(current - 1, -1);
+    setHistoryIndex(nextIdx);
+    return nextIdx === -1 ? '' : items[nextIdx];
+  }, [triggerHaptic]);
 
   return {
     // Shell
@@ -536,14 +598,10 @@ export function useBridge() {
     // Terminal
     screenLines,
     terminalText,
-    inputCommand,
-    setInputCommand,
-    isInputFocused,
-    setIsInputFocused,
     autoScroll,
     setAutoScroll,
     handleTerminalPress,
-    handleHistoryNav,
+    nextHistoryValue,
     sendCommand,
     sendSignal,
     clearScreen,
