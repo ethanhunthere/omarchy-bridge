@@ -1,7 +1,8 @@
-// App shell entry. Implementation lives under ./src:
-//   src/AppRoot.tsx        — providers + layout composition
-//   src/hooks/useBridge.ts — connection, pairing, terminal + hardware state
-//   src/components/*       — dumb views (header, terminal, power, modals)
-//   src/lib/*              — bridge targets, ANSI parser
-//   src/theme/*            — selectable palette tokens + provider
+// App shell entry. Implementation follows FSD slices under ./src:
+//   src/app/                — providers + layout composition
+//   src/views/              — terminal + system screens
+//   src/widgets/            — header, composer (keycaps + input)
+//   src/features/           — settings + confirmation dialogs
+//   src/entities/bridge/    — controller hooks, targets, ANSI parser
+//   src/shared/             — theme tokens/provider, error boundary
 export { default } from './src/app';
