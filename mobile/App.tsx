@@ -48,6 +48,16 @@ async function clearDeviceToken(): Promise<void> {
   } catch (e) {}
 }
 
+async function fetchWithTimeout(url: string, timeoutMs: number, init?: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...(init || {}), signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 interface LegacyConstants {
   manifest?: { debuggerHost?: string };
   manifest2?: { extra?: { expoGo?: { debuggerHost?: string } } };
@@ -677,11 +687,13 @@ export default function App() {
     setPairing(true);
     setPairError('');
 
+    const manualHost = normalizeBridgeHost(hostInput);
     const hosts = resolveCandidateHosts(savedHostRef.current, savedRemoteHostRef.current);
+    if (manualHost && !hosts.includes(manualHost)) hosts.unshift(manualHost);
     let sawRejection = false;
     for (const host of hosts) {
       try {
-        const res = await fetch(`http://${host}:${BRIDGE_PORT}/api/pair`, {
+        const res = await fetchWithTimeout(`http://${host}:${BRIDGE_PORT}/api/pair`, 4000, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code, name }),
@@ -700,6 +712,9 @@ export default function App() {
           await persistDeviceToken(data.token);
           deviceTokenRef.current = data.token;
           setDeviceToken(data.token);
+          persistBridgeHost(host);
+          savedHostRef.current = host;
+          setSavedHost(host);
           setPairCodeInput('');
           setPairError('');
           setPairing(false);
@@ -715,10 +730,10 @@ export default function App() {
     setPairing(false);
     setPairError(
       sawRejection
-        ? 'Wrong or expired code. Check the server log for the current code.'
-        : 'Could not reach the bridge. Check Wi-Fi and host.'
+        ? 'Wrong or expired code. Grab the newest code from the PC log.'
+        : `Could not reach the bridge (${hosts[0]}). Same Wi-Fi as the PC? If mDNS is blocked, set Bridge Host to the PC's LAN IP above and tap Pair Device again.`
     );
-  }, [connect, pairCodeInput, deviceNameInput]);
+  }, [connect, pairCodeInput, deviceNameInput, hostInput]);
 
   const unpairDevice = useCallback(() => {
     clearDeviceToken();
@@ -1211,85 +1226,79 @@ export default function App() {
               return true;
             }}
           >
-            <Text style={styles.dialogTitle}>Bridge Host</Text>
-            <Text style={styles.dialogMessage}>
-              Leave as "{DEFAULT_BRIDGE_HOST}" to discover your PC automatically over Wi-Fi. If mDNS is blocked on your
-              network, enter the PC's LAN IP address instead.
-            </Text>
-            <TextInput
-              style={styles.hostInput}
-              value={hostInput}
-              onChangeText={setHostInput}
-              placeholder={DEFAULT_BRIDGE_HOST}
-              placeholderTextColor="#52525b"
-              autoCapitalize="none"
-              autoCorrect={false}
-              spellCheck={false}
-              keyboardAppearance="dark"
-              returnKeyType="done"
-              onSubmitEditing={applyBridgeHost}
-              testID="host-input"
-            />
-            <Text style={styles.hostHint}>Saved on device. Reconnects immediately on save.</Text>
+            <ScrollView
+              style={styles.dialogScroll}
+              contentContainerStyle={styles.dialogScrollContent}
+              keyboardShouldPersistTaps="handled"
+            >
+              <Text style={styles.dialogTitle}>Bridge Host</Text>
+              <Text style={styles.dialogMessage}>
+                Auto-discovers the PC as "{DEFAULT_BRIDGE_HOST}". If your network blocks mDNS, enter the PC's LAN IP.
+              </Text>
+              <Text style={styles.fieldLabel}>Bridge host</Text>
+              <TextInput
+                style={[styles.hostInput, styles.fieldInput]}
+                value={hostInput}
+                onChangeText={setHostInput}
+                placeholder={DEFAULT_BRIDGE_HOST}
+                placeholderTextColor="#52525b"
+                autoCapitalize="none"
+                autoCorrect={false}
+                spellCheck={false}
+                keyboardAppearance="dark"
+                returnKeyType="done"
+                onSubmitEditing={applyBridgeHost}
+                testID="host-input"
+              />
 
-            <View style={styles.modalDivider} />
+              <View style={styles.modalDivider} />
 
-            {deviceToken ? (
-              <View>
-                <Text style={styles.dialogTitle}>Device Paired</Text>
-                <Text style={styles.dialogMessage}>
-                  This device holds its own key in the OS keychain. Revoke it anytime from the PC.
-                </Text>
-                <TouchableOpacity style={styles.dialogBtnSecondary} testID="unpair-btn" onPress={unpairDevice}>
-                  <Text style={styles.dialogBtnSecondaryText}>Forget This Device</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View>
-                <Text style={styles.dialogTitle}>Pair This Device</Text>
-                <Text style={styles.dialogMessage}>Run this in the PC terminal:</Text>
-                <Text style={styles.commandBlock}>journalctl --user -u omarchy-bridge | grep PAIRING</Text>
-                <Text style={styles.dialogMessage}>
-                  Enter the most recent 6-digit code below. Codes are valid for 10 minutes.
-                </Text>
-                <TextInput
-                  style={styles.hostInput}
-                  value={pairCodeInput}
-                  onChangeText={(text) => {
-                    const cleaned = text.replace(/\D/g, '').slice(0, 6);
-                    setPairCodeInput(cleaned);
-                    if (cleaned.length === 6) Keyboard.dismiss();
-                  }}
-                  placeholder="6-digit code"
-                  placeholderTextColor="#52525b"
-                  keyboardType="number-pad"
-                  maxLength={6}
-                  keyboardAppearance="dark"
-                  testID="pair-code-input"
-                />
-                <TextInput
-                  style={styles.hostInput}
-                  value={deviceNameInput}
-                  onChangeText={setDeviceNameInput}
-                  placeholder="Device name"
-                  placeholderTextColor="#52525b"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  maxLength={40}
-                  keyboardAppearance="dark"
-                  testID="pair-name-input"
-                />
-                {pairError ? <Text style={styles.pairError}>{pairError}</Text> : null}
-                <TouchableOpacity
-                  style={styles.dialogBtnPrimary}
-                  testID="pair-btn"
-                  onPress={pairDevice}
-                  disabled={pairing}
-                >
-                  <Text style={styles.dialogBtnPrimaryText}>{pairing ? 'Pairing...' : 'Pair Device'}</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+              {deviceToken ? (
+                <View>
+                  <Text style={styles.dialogTitle}>Device Paired</Text>
+                  <Text style={styles.dialogMessage}>This device holds its own key in the OS keychain.</Text>
+                  <TouchableOpacity style={styles.dialogBtnSecondary} testID="unpair-btn" onPress={unpairDevice}>
+                    <Text style={styles.dialogBtnSecondaryText}>Forget This Device</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View>
+                  <Text style={styles.dialogTitle}>Pair This Device</Text>
+                  <Text style={styles.dialogMessage}>Get the newest code from the PC terminal:</Text>
+                  <Text style={styles.commandBlock}>journalctl --user -u omarchy-bridge | grep PAIRING</Text>
+                  <Text style={styles.fieldLabel}>Device name</Text>
+                  <TextInput
+                    style={[styles.hostInput, styles.fieldInput]}
+                    value={deviceNameInput}
+                    onChangeText={setDeviceNameInput}
+                    placeholder="iPhone"
+                    placeholderTextColor="#52525b"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    maxLength={40}
+                    keyboardAppearance="dark"
+                    testID="pair-name-input"
+                  />
+                  <Text style={styles.fieldLabel}>Pairing code</Text>
+                  <TextInput
+                    style={[styles.hostInput, styles.fieldInput]}
+                    value={pairCodeInput}
+                    onChangeText={(text) => {
+                      const cleaned = text.replace(/\D/g, '').slice(0, 6);
+                      setPairCodeInput(cleaned);
+                      if (cleaned.length === 6) Keyboard.dismiss();
+                    }}
+                    placeholder="6-digit code"
+                    placeholderTextColor="#52525b"
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    keyboardAppearance="dark"
+                    testID="pair-code-input"
+                  />
+                  {pairError ? <Text style={styles.pairError}>{pairError}</Text> : null}
+                </View>
+              )}
+            </ScrollView>
 
             <View style={styles.dialogActions}>
               <TouchableOpacity
@@ -1300,9 +1309,20 @@ export default function App() {
                 <Text style={styles.dialogBtnSecondaryText}>Close</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.dialogBtnPrimary} testID="host-save-btn" onPress={applyBridgeHost}>
-                <Text style={styles.dialogBtnPrimaryText}>Save & Reconnect</Text>
-              </TouchableOpacity>
+              {deviceToken ? (
+                <TouchableOpacity style={styles.dialogBtnPrimary} testID="host-save-btn" onPress={applyBridgeHost}>
+                  <Text style={styles.dialogBtnPrimaryText}>Save & Reconnect</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.dialogBtnPrimary}
+                  testID="pair-btn"
+                  onPress={pairDevice}
+                  disabled={pairing}
+                >
+                  <Text style={styles.dialogBtnPrimaryText}>{pairing ? 'Pairing...' : 'Pair Device'}</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
         </TouchableOpacity>
@@ -1835,6 +1855,15 @@ const styles = StyleSheet.create({
     padding: 18,
     borderWidth: 1,
     borderColor: '#262936',
+    width: '100%',
+    maxWidth: 420,
+    maxHeight: '82%',
+  },
+  dialogScroll: {
+    flexGrow: 0,
+  },
+  dialogScrollContent: {
+    paddingBottom: 2,
   },
   dialogTitle: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
@@ -1848,7 +1877,7 @@ const styles = StyleSheet.create({
     fontSize: 12.5,
     color: '#a1a1aa',
     lineHeight: 18,
-    marginBottom: 18,
+    marginBottom: 12,
   },
   dialogActions: {
     flexDirection: 'row',
@@ -1921,7 +1950,20 @@ const styles = StyleSheet.create({
   modalDivider: {
     height: 1,
     backgroundColor: '#262936',
+    marginTop: 4,
     marginBottom: 16,
+  },
+  fieldLabel: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 11,
+    color: '#717688',
+    letterSpacing: 0.6,
+    textTransform: 'uppercase',
+    marginTop: 10,
+    marginBottom: 6,
+  },
+  fieldInput: {
+    marginBottom: 4,
   },
   pairError: {
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
