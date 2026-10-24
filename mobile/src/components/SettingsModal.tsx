@@ -1,5 +1,8 @@
-import React, { memo, useEffect, useRef, useState } from 'react';
+import React, { memo, useEffect, useRef } from 'react';
 import {
+  Animated,
+  Dimensions,
+  Easing,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -10,10 +13,20 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider';
 import { ThemeTokens } from '../theme/palettes';
 import { DEFAULT_BRIDGE_HOST } from '../lib/bridge';
+
+// iOS animates the inset in step with the keyboard; Android lets the dialog
+// KeyboardAvoidingView shrink instead.
+function ModalShell({ style, children }: { style: any; children: React.ReactNode }) {
+  if (Platform.OS === 'ios') return <Animated.View style={style}>{children}</Animated.View>;
+  return (
+    <KeyboardAvoidingView style={style} behavior="height">
+      {children}
+    </KeyboardAvoidingView>
+  );
+}
 
 export interface SettingsModalProps {
   visible: boolean;
@@ -35,8 +48,7 @@ export default memo(function SettingsModal(props: SettingsModalProps) {
   const { theme } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
   const pendingScrollRef = useRef(false);
-  const [keyboardVisible, setKeyboardVisible] = useState(false);
-  const insets = useSafeAreaInsets();
+  const modalInset = useRef(new Animated.Value(0)).current;
   const {
     visible,
     onClose,
@@ -52,23 +64,32 @@ export default memo(function SettingsModal(props: SettingsModalProps) {
     onUnpair,
   } = props;
 
-  // Keep the dialog top-aligned while typing so the card never gets pushed
-  // off-screen by the keyboard, and scroll the focused field into view once
-  // the keyboard has actually resized the layout.
+  // Scroll the focused field into view after the keyboard has resized us.
   useEffect(() => {
     const show = Keyboard.addListener('keyboardDidShow', () => {
-      setKeyboardVisible(true);
       if (pendingScrollRef.current) {
         pendingScrollRef.current = false;
         scrollRef.current?.scrollToEnd({ animated: true });
       }
     });
-    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
-    return () => {
-      show.remove();
-      hide.remove();
-    };
+    return () => show.remove();
   }, []);
+
+  // Same animated inset trick as the terminal composer: no card jump.
+  useEffect(() => {
+    if (Platform.OS !== 'ios') return;
+    const sub = Keyboard.addListener('keyboardWillChangeFrame', (e) => {
+      if (!e.endCoordinates) return;
+      const overlap = Math.max(0, Dimensions.get('screen').height - e.endCoordinates.screenY);
+      Animated.timing(modalInset, {
+        toValue: overlap,
+        duration: e.duration || 250,
+        easing: Easing.bezier(0.17, 0.59, 0.4, 0.99),
+        useNativeDriver: false,
+      }).start();
+    });
+    return () => sub.remove();
+  }, [modalInset]);
 
   const onFieldFocus = () => {
     pendingScrollRef.current = true;
@@ -91,17 +112,8 @@ export default memo(function SettingsModal(props: SettingsModalProps) {
       navigationBarTranslucent
       onRequestClose={onClose}
     >
-      <KeyboardAvoidingView
-        style={styles.modalKav}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      >
-        <View
-          style={[
-            styles.modalBackdrop,
-            keyboardVisible && styles.modalBackdropKeyboard,
-            keyboardVisible && { paddingTop: insets.top + 12 },
-          ]}
-        >
+      <ModalShell style={[styles.modalKav, Platform.OS === 'ios' && { paddingBottom: modalInset }]}>
+        <View style={styles.modalBackdrop}>
           <TouchableOpacity
             style={styles.modalDismissLayer}
             activeOpacity={1}
@@ -220,7 +232,7 @@ export default memo(function SettingsModal(props: SettingsModalProps) {
             </View>
           </View>
         </View>
-      </KeyboardAvoidingView>
+      </ModalShell>
     </Modal>
   );
 });
@@ -235,9 +247,6 @@ const makeStyles = (t: ThemeTokens) =>
       backgroundColor: 'rgba(0,0,0,0.75)',
       justifyContent: 'center',
       padding: 24,
-    },
-    modalBackdropKeyboard: {
-      justifyContent: 'flex-start',
     },
     modalDismissLayer: {
       position: 'absolute',

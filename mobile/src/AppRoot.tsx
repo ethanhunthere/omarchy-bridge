@@ -46,29 +46,33 @@ function ThemedApp() {
         </View>
       </View>
 
-      <SettingsModal
-        visible={bridge.hostModalVisible}
-        onClose={() => bridge.setHostModalVisible(false)}
-        deviceToken={bridge.deviceToken}
-        hostInput={bridge.hostInput}
-        setHostInput={bridge.setHostInput}
-        onApplyHost={bridge.applyBridgeHost}
-        pairCodeInput={bridge.pairCodeInput}
-        setPairCodeInput={bridge.setPairCodeInput}
-        pairError={bridge.pairError}
-        pairing={bridge.pairing}
-        onPair={bridge.pairDevice}
-        onUnpair={bridge.unpairDevice}
-      />
+      {bridge.hostModalVisible && (
+        <SettingsModal
+          visible
+          onClose={() => bridge.setHostModalVisible(false)}
+          deviceToken={bridge.deviceToken}
+          hostInput={bridge.hostInput}
+          setHostInput={bridge.setHostInput}
+          onApplyHost={bridge.applyBridgeHost}
+          pairCodeInput={bridge.pairCodeInput}
+          setPairCodeInput={bridge.setPairCodeInput}
+          pairError={bridge.pairError}
+          pairing={bridge.pairing}
+          onPair={bridge.pairDevice}
+          onUnpair={bridge.unpairDevice}
+        />
+      )}
 
-      <ConfirmModal
-        state={bridge.confirmModal}
-        onCancel={() => bridge.setConfirmModal((p) => ({ ...p, visible: false }))}
-        onExecute={() => {
-          bridge.dispatchAction(bridge.confirmModal.action);
-          bridge.setConfirmModal((p) => ({ ...p, visible: false }));
-        }}
-      />
+      {bridge.confirmModal.visible && (
+        <ConfirmModal
+          state={bridge.confirmModal}
+          onCancel={() => bridge.setConfirmModal((p) => ({ ...p, visible: false }))}
+          onExecute={() => {
+            bridge.dispatchAction(bridge.confirmModal.action);
+            bridge.setConfirmModal((p) => ({ ...p, visible: false }));
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }

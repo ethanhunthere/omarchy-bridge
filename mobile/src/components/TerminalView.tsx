@@ -1,8 +1,9 @@
 import React, { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   Dimensions,
+  Easing,
   Keyboard,
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   Text,
@@ -403,8 +404,8 @@ export default function TerminalView({ bridge }: { bridge: BridgeController }) {
     const show = Keyboard.addListener('keyboardDidShow', () => {
       if (!autoScroll) return;
       scrollViewRef.current?.scrollToEnd({ animated: true });
-      // KAV applies its padding on the same frame; settle once more after.
-      settleTimer = setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 120);
+      // The inset animation runs ~250ms; settle once more after it lands.
+      settleTimer = setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 300);
     });
     return () => {
       if (settleTimer) clearTimeout(settleTimer);
@@ -412,33 +413,45 @@ export default function TerminalView({ bridge }: { bridge: BridgeController }) {
     };
   }, [autoScroll, scrollViewRef]);
 
-  // KeyboardAvoidingView compares its own (parent-relative) frame against the
-  // keyboard's screenY, so it needs the tab's absolute top as the offset or
-  // the input bar stays buried under the keyboard by header + safe-area px.
+  // Animate the inset ourselves instead of jumping: KeyboardAvoidingView
+  // applies its padding in one frame, which makes the keycap row appear to
+  // flash above the keyboard while iOS is still sliding it up.
   const anchorRef = useRef<View>(null);
-  const anchorTopRef = useRef(0);
-  const [keyboardOffset, setKeyboardOffset] = useState(0);
+  const anchorBottomRef = useRef(0);
+  const keyboardInset = useRef(new Animated.Value(0)).current;
 
-  const measureAnchorTop = useCallback(() => {
-    anchorRef.current?.measureInWindow?.((_x: number, y: number) => {
-      if (typeof y === 'number' && Math.abs(y - anchorTopRef.current) > 0.5) {
-        anchorTopRef.current = y;
-        setKeyboardOffset(y);
-      }
+  const measureAnchor = useCallback(() => {
+    anchorRef.current?.measureInWindow?.((_x: number, y: number, _w: number, h: number) => {
+      if (typeof y === 'number' && typeof h === 'number') anchorBottomRef.current = y + h;
     });
   }, []);
 
   useEffect(() => {
-    const timer = setTimeout(measureAnchorTop, 0);
-    const dims = Dimensions.addEventListener('change', measureAnchorTop);
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const show = Keyboard.addListener(showEvent, measureAnchorTop);
+    measureAnchor();
+    const dims = Dimensions.addEventListener('change', measureAnchor);
+    const show = Keyboard.addListener(Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow', measureAnchor);
     return () => {
-      clearTimeout(timer);
       dims.remove();
       show.remove();
     };
-  }, [measureAnchorTop]);
+  }, [measureAnchor]);
+
+  useEffect(() => {
+    // Android resizes the window itself (softwareKeyboardLayoutMode=resize),
+    // so only iOS needs the animated inset.
+    if (Platform.OS !== 'ios') return;
+    const sub = Keyboard.addListener('keyboardWillChangeFrame', (e) => {
+      if (!e.endCoordinates) return;
+      const overlap = Math.max(0, anchorBottomRef.current - e.endCoordinates.screenY);
+      Animated.timing(keyboardInset, {
+        toValue: overlap,
+        duration: e.duration || 250,
+        easing: Easing.bezier(0.17, 0.59, 0.4, 0.99),
+        useNativeDriver: false,
+      }).start();
+    });
+    return () => sub.remove();
+  }, [keyboardInset]);
 
   // Tap the output: open the keyboard, or close it if it is already up.
   const onTerminalPress = useCallback(() => {
@@ -466,14 +479,8 @@ export default function TerminalView({ bridge }: { bridge: BridgeController }) {
   }, []);
 
   return (
-    <View ref={anchorRef} style={styles.flexOne} collapsable={false} onLayout={measureAnchorTop}>
-      <KeyboardAvoidingView
-        style={styles.flexOne}
-        // Android uses softwareKeyboardLayoutMode="resize": the window already
-        // shrinks, so adding KAV height on top would double-compress the view.
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={keyboardOffset}
-      >
+    <View ref={anchorRef} style={styles.flexOne} collapsable={false} onLayout={measureAnchor}>
+      <Animated.View style={[styles.flexOne, { paddingBottom: keyboardInset }]}>
         <View style={styles.flexOne}>
           <TerminalBody
             screenLines={screenLines}
@@ -499,7 +506,7 @@ export default function TerminalView({ bridge }: { bridge: BridgeController }) {
             onBlurred={onInputBlurred}
           />
         </View>
-      </KeyboardAvoidingView>
+      </Animated.View>
     </View>
   );
 }

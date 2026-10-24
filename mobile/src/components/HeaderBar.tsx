@@ -17,6 +17,7 @@ const ConnectionPill = memo(function ConnectionPill({
 }) {
   const styles = useThemedStyles(makeStyles);
   const isOffline = status === 'disconnected';
+  const isConnecting = status === 'connecting';
   const label = !paired
     ? 'PAIR'
     : status === 'connected'
@@ -31,12 +32,26 @@ const ConnectionPill = memo(function ConnectionPill({
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
-      style={[styles.latencyPill, isOffline && styles.latencyPillOffline]}
+      style={[
+        styles.latencyPill,
+        !paired && styles.latencyPillIdle,
+        isConnecting && styles.latencyPillConnecting,
+        isOffline && styles.latencyPillOffline,
+      ]}
       testID="connection-pill"
       accessibilityRole="button"
       accessibilityLabel={`Connection ${label}`}
     >
-      <Text style={[styles.latencyText, isOffline && styles.latencyTextOffline]} numberOfLines={1} maxFontSizeMultiplier={1.2}>
+      <Text
+        style={[
+          styles.latencyText,
+          !paired && styles.latencyTextIdle,
+          isConnecting && styles.latencyTextConnecting,
+          isOffline && styles.latencyTextOffline,
+        ]}
+        numberOfLines={1}
+        maxFontSizeMultiplier={1.2}
+      >
         {label}
       </Text>
     </TouchableOpacity>
@@ -115,17 +130,31 @@ const makeStyles = (t: ThemeTokens) =>
       justifyContent: 'center',
       borderRadius: 12,
     },
+    latencyPillIdle: {
+      borderColor: t.borderStrong,
+    },
+    latencyPillConnecting: {
+      borderColor: 'rgba(251, 191, 36, 0.45)',
+    },
     latencyText: {
       fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
       fontSize: 9,
       fontWeight: '600',
+      color: t.success,
+    },
+    latencyTextIdle: {
       color: t.textSecondary,
+    },
+    latencyTextConnecting: {
+      color: t.warning,
     },
     latencyPillOffline: {
       borderColor: t.dangerBorder,
+      backgroundColor: t.dangerBg,
     },
     latencyTextOffline: {
       color: t.danger,
+      fontWeight: '700',
     },
     segmentedControl: {
       flexDirection: 'row',

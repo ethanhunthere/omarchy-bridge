@@ -135,14 +135,16 @@ describe('Agent 3: TextInput & Typing Responsiveness Test Suite', () => {
   });
 
   describe('Requirement 6: Input bar stays visible while the keyboard is up', () => {
-    test('KAV offset is the tab absolute top measured in window, not 0', () => {
+    test('keyboard inset is measured against the tab bottom, not a guessed offset', () => {
       expect(code.includes('measureInWindow')).toBe(true);
-      expect(code.includes('keyboardVerticalOffset={keyboardOffset}')).toBe(true);
-      expect(code.includes('keyboardVerticalOffset={0}')).toBe(false);
+      expect(code.includes('anchorBottomRef.current - e.endCoordinates.screenY')).toBe(true);
+      expect(code.includes('paddingBottom: keyboardInset')).toBe(true);
     });
 
-    test('iOS pads, Android leaves resize to the window', () => {
-      expect(code.includes("behavior={Platform.OS === 'ios' ? 'padding' : undefined}")).toBe(true);
+    test('iOS animates the inset with the keyboard duration, Android defers to resize', () => {
+      expect(code.includes("Keyboard.addListener('keyboardWillChangeFrame'")).toBe(true);
+      expect(code.includes('duration: e.duration || 250')).toBe(true);
+      expect(code.includes("if (Platform.OS !== 'ios') return;")).toBe(true);
     });
 
     test('send keeps focus instead of blurring the keyboard', () => {

@@ -81,6 +81,18 @@ const rnMock = {
   StyleSheet: {
     create: (styles: any) => styles,
   },
+  Animated: {
+    View: mockComponent('Animated.View'),
+    Value: class {
+      constructor(public _value: number) {}
+      setValue() {}
+      interpolate() {
+        return this;
+      }
+    },
+    timing: (_value: any, _config: any) => ({ start: (cb?: (r: any) => void) => cb && cb({ finished: true }) }),
+  },
+  Easing: { bezier: () => (t: number) => t },
   Text: mockComponent('Text'),
   View: mockComponent('View'),
   TextInput: mockComponent('TextInput'),
