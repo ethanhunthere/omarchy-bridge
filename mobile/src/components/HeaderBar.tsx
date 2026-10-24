@@ -82,7 +82,7 @@ export default memo(function HeaderBar({
     <View style={styles.header}>
       <View style={[styles.segmentedControl, { backgroundColor: theme.chipBg }]}>
         {renderSegment('terminal', 'TERMINAL')}
-        {renderSegment('power', 'POWER')}
+        {renderSegment('power', 'SYSTEM')}
       </View>
       <ConnectionPill latency={latency} status={status} paired={paired} onPress={onPressPill} />
     </View>

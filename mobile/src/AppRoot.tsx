@@ -14,7 +14,7 @@ import { useBridge } from './hooks/useBridge';
 function ThemedApp() {
   const bridge = useBridge();
   const styles = useThemedStyles(makeStyles);
-  const { theme, themeId, setThemeId } = useTheme();
+  const { theme } = useTheme();
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
@@ -59,8 +59,6 @@ function ThemedApp() {
         pairing={bridge.pairing}
         onPair={bridge.pairDevice}
         onUnpair={bridge.unpairDevice}
-        themeId={themeId}
-        onSelectTheme={setThemeId}
       />
 
       <ConfirmModal

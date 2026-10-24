@@ -1,11 +1,12 @@
 import React from 'react';
 import { Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { useThemedStyles } from '../theme/ThemeProvider';
-import { ThemeTokens } from '../theme/palettes';
+import { useTheme, useThemedStyles } from '../theme/ThemeProvider';
+import { ThemeTokens, THEMES } from '../theme/palettes';
 import { BridgeController } from '../hooks/useBridge';
 
 export default function PowerView({ bridge }: { bridge: BridgeController }) {
   const styles = useThemedStyles(makeStyles);
+  const { themeId, setThemeId } = useTheme();
   const {
     telemetry,
     status,
@@ -138,6 +139,34 @@ export default function PowerView({ bridge }: { bridge: BridgeController }) {
           Unused high-risk poweroff, reboot, and Wake-on-LAN controls are excluded to prevent remote session disconnection on wireless hardware.
         </Text>
       </View>
+
+      {/* Appearance */}
+      <View style={styles.groupHeaderRow}>
+        <Text style={styles.groupHeading}>APPEARANCE</Text>
+      </View>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.themeRow}
+        keyboardShouldPersistTaps="handled"
+      >
+        {THEMES.map((t) => {
+          const active = t.id === themeId;
+          return (
+            <TouchableOpacity
+              key={t.id}
+              style={[styles.themeChip, active && styles.themeChipActive]}
+              onPress={() => setThemeId(t.id)}
+              testID={`theme-option-${t.id}`}
+              accessibilityRole="button"
+              accessibilityState={{ selected: active }}
+            >
+              <View style={[styles.themeSwatch, { backgroundColor: t.bg, borderColor: t.accent }]} />
+              <Text style={[styles.themeChipText, active && styles.themeChipTextActive]}>{t.name}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
     </ScrollView>
   );
 }
@@ -320,5 +349,42 @@ const makeStyles = (t: ThemeTokens) =>
       fontWeight: '700',
       color: t.textSecondary,
       letterSpacing: 0.8,
+    },
+    themeRow: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingBottom: 2,
+    },
+    themeChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      minHeight: 40,
+      borderRadius: 6,
+      borderWidth: 1,
+      borderColor: t.border,
+      backgroundColor: t.surface,
+    },
+    themeChipActive: {
+      borderColor: t.focus,
+      backgroundColor: t.surfaceElevated,
+    },
+    themeSwatch: {
+      width: 14,
+      height: 14,
+      borderRadius: 3,
+      borderWidth: 1,
+    },
+    themeChipText: {
+      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+      fontSize: 11,
+      fontWeight: '700',
+      color: t.textMuted,
+      letterSpacing: 0.4,
+    },
+    themeChipTextActive: {
+      color: t.textPrimary,
     },
   }) as const;

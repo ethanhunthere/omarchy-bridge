@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider';
-import { ThemeTokens, THEMES } from '../theme/palettes';
+import { ThemeTokens } from '../theme/palettes';
 import { DEFAULT_BRIDGE_HOST } from '../lib/bridge';
 
 export interface SettingsModalProps {
@@ -28,8 +28,6 @@ export interface SettingsModalProps {
   pairing: boolean;
   onPair: () => void;
   onUnpair: () => void;
-  themeId: string;
-  onSelectTheme: (id: string) => void;
 }
 
 export default memo(function SettingsModal(props: SettingsModalProps) {
@@ -52,8 +50,6 @@ export default memo(function SettingsModal(props: SettingsModalProps) {
     pairing,
     onPair,
     onUnpair,
-    themeId,
-    onSelectTheme,
   } = props;
 
   // Keep the dialog top-aligned while typing so the card never gets pushed
@@ -185,34 +181,6 @@ export default memo(function SettingsModal(props: SettingsModalProps) {
                   {pairError ? <Text style={styles.pairError}>{pairError}</Text> : null}
                 </View>
               )}
-
-              <View style={styles.modalDivider} />
-
-              <Text style={styles.dialogTitle}>Appearance</Text>
-              <Text style={styles.dialogMessage}>Terminal palette, applied instantly and saved on this device.</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.themeRow}
-                keyboardShouldPersistTaps="handled"
-              >
-                {THEMES.map((t) => {
-                  const active = t.id === themeId;
-                  return (
-                    <TouchableOpacity
-                      key={t.id}
-                      style={[styles.themeChip, active && styles.themeChipActive]}
-                      onPress={() => onSelectTheme(t.id)}
-                      testID={`theme-option-${t.id}`}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
-                    >
-                      <View style={[styles.themeSwatch, { backgroundColor: t.bg, borderColor: t.accent }]} />
-                      <Text style={[styles.themeChipText, active && styles.themeChipTextActive]}>{t.name}</Text>
-                    </TouchableOpacity>
-                  );
-                })}
-              </ScrollView>
             </ScrollView>
 
             <View style={styles.dialogActions}>
@@ -400,42 +368,5 @@ const makeStyles = (t: ThemeTokens) =>
       paddingHorizontal: 10,
       paddingVertical: 8,
       marginBottom: 12,
-    },
-    themeRow: {
-      flexDirection: 'row',
-      gap: 8,
-      paddingBottom: 2,
-    },
-    themeChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      paddingHorizontal: 10,
-      paddingVertical: 8,
-      minHeight: 40,
-      borderRadius: 6,
-      borderWidth: 1,
-      borderColor: t.border,
-      backgroundColor: t.surface,
-    },
-    themeChipActive: {
-      borderColor: t.focus,
-      backgroundColor: t.surfaceElevated,
-    },
-    themeSwatch: {
-      width: 14,
-      height: 14,
-      borderRadius: 3,
-      borderWidth: 1,
-    },
-    themeChipText: {
-      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-      fontSize: 11,
-      fontWeight: '700',
-      color: t.textMuted,
-      letterSpacing: 0.4,
-    },
-    themeChipTextActive: {
-      color: t.textPrimary,
     },
   }) as const;

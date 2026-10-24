@@ -188,7 +188,7 @@ function getSegmentedButtons(root: any) {
     getAllTextStrings(t).some((str) => str.trim() === 'TERMINAL')
   );
   const powerBtn = touchables.find((t: any) =>
-    getAllTextStrings(t).some((str) => str.trim() === 'POWER')
+    getAllTextStrings(t).some((str) => str.trim() === 'SYSTEM')
   );
   return { terminalBtn, powerBtn };
 }
