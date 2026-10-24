@@ -36,7 +36,9 @@ const ConnectionPill = memo(function ConnectionPill({
       accessibilityRole="button"
       accessibilityLabel={`Connection ${label}`}
     >
-      <Text style={[styles.latencyText, isOffline && styles.latencyTextOffline]}>{label}</Text>
+      <Text style={[styles.latencyText, isOffline && styles.latencyTextOffline]} numberOfLines={1} maxFontSizeMultiplier={1.2}>
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 });
@@ -69,7 +71,9 @@ export default memo(function HeaderBar({
         accessibilityState={{ selected: active }}
         accessibilityLabel={label}
       >
-        <Text style={[styles.segmentText, active && styles.segmentTextActive]}>{label}</Text>
+        <Text style={[styles.segmentText, active && styles.segmentTextActive]} numberOfLines={1} maxFontSizeMultiplier={1.2}>
+          {label}
+        </Text>
       </TouchableOpacity>
     );
   };
@@ -101,6 +105,7 @@ const makeStyles = (t: ThemeTokens) =>
     latencyPill: {
       position: 'absolute',
       right: 14,
+      maxWidth: 96,
       backgroundColor: 'rgba(255, 255, 255, 0.04)',
       borderWidth: 1,
       borderColor: 'rgba(255, 255, 255, 0.08)',

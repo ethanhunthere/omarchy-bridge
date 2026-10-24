@@ -1,4 +1,4 @@
-import React, { memo, useRef } from 'react';
+import React, { memo, useEffect, useRef, useState } from 'react';
 import {
   Keyboard,
   KeyboardAvoidingView,
@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme, useThemedStyles } from '../theme/ThemeProvider';
 import { ThemeTokens, THEMES } from '../theme/palettes';
 import { DEFAULT_BRIDGE_HOST } from '../lib/bridge';
@@ -35,6 +36,9 @@ export default memo(function SettingsModal(props: SettingsModalProps) {
   const styles = useThemedStyles(makeStyles);
   const { theme } = useTheme();
   const scrollRef = useRef<ScrollView>(null);
+  const pendingScrollRef = useRef(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+  const insets = useSafeAreaInsets();
   const {
     visible,
     onClose,
@@ -52,6 +56,35 @@ export default memo(function SettingsModal(props: SettingsModalProps) {
     onSelectTheme,
   } = props;
 
+  // Keep the dialog top-aligned while typing so the card never gets pushed
+  // off-screen by the keyboard, and scroll the focused field into view once
+  // the keyboard has actually resized the layout.
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => {
+      setKeyboardVisible(true);
+      if (pendingScrollRef.current) {
+        pendingScrollRef.current = false;
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardVisible(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+
+  const onFieldFocus = () => {
+    pendingScrollRef.current = true;
+    // Keyboard may already be up (second field): scroll after the layout pass.
+    setTimeout(() => {
+      if (pendingScrollRef.current) {
+        pendingScrollRef.current = false;
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }
+    }, 300);
+  };
+
   return (
     <Modal
       visible={visible}
@@ -66,12 +99,20 @@ export default memo(function SettingsModal(props: SettingsModalProps) {
         style={styles.modalKav}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          testID="host-backdrop"
-          onPress={Keyboard.dismiss}
+        <View
+          style={[
+            styles.modalBackdrop,
+            keyboardVisible && styles.modalBackdropKeyboard,
+            keyboardVisible && { paddingTop: insets.top + 12 },
+          ]}
         >
+          <TouchableOpacity
+            style={styles.modalDismissLayer}
+            activeOpacity={1}
+            testID="host-backdrop"
+            onPress={Keyboard.dismiss}
+            accessibilityLabel="Dismiss keyboard"
+          />
           <View style={styles.dialogCard}>
             <ScrollView
               ref={scrollRef}
@@ -99,6 +140,8 @@ export default memo(function SettingsModal(props: SettingsModalProps) {
                 onSubmitEditing={onApplyHost}
                 textContentType="none"
                 autoComplete="off"
+                importantForAutofill="no"
+                onFocus={onFieldFocus}
                 testID="host-input"
               />
 
@@ -116,7 +159,7 @@ export default memo(function SettingsModal(props: SettingsModalProps) {
                 <View>
                   <Text style={styles.dialogTitle}>Pair This Device</Text>
                   <Text style={styles.dialogMessage}>Get the newest code from the PC terminal:</Text>
-                  <Text style={styles.commandBlock} selectable>
+                  <Text style={styles.commandBlock} selectable allowFontScaling={false}>
                     journalctl --user -u omarchy-bridge | grep PAIRING
                   </Text>
                   <Text style={styles.fieldLabel}>Pairing code</Text>
@@ -135,7 +178,8 @@ export default memo(function SettingsModal(props: SettingsModalProps) {
                     keyboardAppearance="dark"
                     textContentType="none"
                     autoComplete="off"
-                    onFocus={() => scrollRef.current?.scrollToEnd({ animated: true })}
+                    importantForAutofill="no"
+                    onFocus={onFieldFocus}
                     testID="pair-code-input"
                   />
                   {pairError ? <Text style={styles.pairError}>{pairError}</Text> : null}
@@ -181,14 +225,14 @@ export default memo(function SettingsModal(props: SettingsModalProps) {
                 }}
                 accessibilityRole="button"
               >
-                <Text style={styles.dialogBtnSecondaryText} numberOfLines={1}>
+                <Text style={styles.dialogBtnSecondaryText} numberOfLines={1} maxFontSizeMultiplier={1.3}>
                   Close
                 </Text>
               </TouchableOpacity>
 
               {deviceToken ? (
                 <TouchableOpacity style={styles.dialogBtnPrimary} testID="host-save-btn" onPress={onApplyHost} accessibilityRole="button">
-                  <Text style={styles.dialogBtnPrimaryText} numberOfLines={1}>
+                  <Text style={styles.dialogBtnPrimaryText} numberOfLines={1} maxFontSizeMultiplier={1.3}>
                     Save & Reconnect
                   </Text>
                 </TouchableOpacity>
@@ -200,14 +244,14 @@ export default memo(function SettingsModal(props: SettingsModalProps) {
                   disabled={pairing}
                   accessibilityRole="button"
                 >
-                  <Text style={styles.dialogBtnPrimaryText} numberOfLines={1}>
+                  <Text style={styles.dialogBtnPrimaryText} numberOfLines={1} maxFontSizeMultiplier={1.3}>
                     {pairing ? 'Pairing...' : 'Pair Device'}
                   </Text>
                 </TouchableOpacity>
               )}
             </View>
           </View>
-        </TouchableOpacity>
+        </View>
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -223,6 +267,16 @@ const makeStyles = (t: ThemeTokens) =>
       backgroundColor: 'rgba(0,0,0,0.75)',
       justifyContent: 'center',
       padding: 24,
+    },
+    modalBackdropKeyboard: {
+      justifyContent: 'flex-start',
+    },
+    modalDismissLayer: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
     },
     dialogCard: {
       backgroundColor: t.surfaceElevated,

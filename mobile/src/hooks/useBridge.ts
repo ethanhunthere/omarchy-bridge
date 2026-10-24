@@ -1,5 +1,5 @@
 import { startTransition, useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Dimensions, Keyboard, Platform, ScrollView, TextInput } from 'react-native';
+import { AppState, Dimensions, Keyboard, ScrollView } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import {
   BRIDGE_PORT,
@@ -69,7 +69,6 @@ export function useBridge() {
   // Terminal state
   const [screenLines, setScreenLines] = useState<string[]>([]);
   const [terminalText, setTerminalText] = useState<string>('');
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [autoScroll, setAutoScroll] = useState(true);
@@ -86,7 +85,6 @@ export function useBridge() {
 
   // Low-latency refs
   const socketRef = useRef<WebSocket | null>(null);
-  const inputRef = useRef<TextInput | null>(null);
   const scrollViewRef = useRef<ScrollView | null>(null);
   const incomingBufferRef = useRef('');
   const flushTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -123,18 +121,6 @@ export function useBridge() {
     pendingScreenRef.current = lines;
   }, []);
 
-  // Keyboard visibility feeds tap-to-focus terminal behavior
-  useEffect(() => {
-    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvent, () => setIsKeyboardVisible(true));
-    const hideSub = Keyboard.addListener(hideEvent, () => setIsKeyboardVisible(false));
-    return () => {
-      showSub.remove();
-      hideSub.remove();
-    };
-  }, []);
-
   // Re-negotiate terminal grid when the window changes (rotation, resize)
   useEffect(() => {
     const subscription = Dimensions.addEventListener('change', ({ window }) => {
@@ -154,14 +140,6 @@ export function useBridge() {
       else if (type === 'warning') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
     } catch (e) {}
   }, []);
-
-  const handleTerminalPress = useCallback(() => {
-    if (isKeyboardVisible) {
-      Keyboard.dismiss();
-    } else {
-      inputRef.current?.focus();
-    }
-  }, [isKeyboardVisible]);
 
   const selectTab = useCallback(
     (tab: 'terminal' | 'power') => {
@@ -350,6 +328,7 @@ export function useBridge() {
   }, [connect, teardownSocket]);
 
   const openHostEditor = useCallback(() => {
+    Keyboard.dismiss();
     setHostInput(savedHostRef.current || DEFAULT_BRIDGE_HOST);
     setPairError('');
     setHostModalVisible(true);
@@ -600,7 +579,6 @@ export function useBridge() {
     terminalText,
     autoScroll,
     setAutoScroll,
-    handleTerminalPress,
     nextHistoryValue,
     sendCommand,
     sendSignal,
@@ -612,7 +590,6 @@ export function useBridge() {
     confirmModal,
     setConfirmModal,
     // Refs
-    inputRef,
     scrollViewRef,
     scrollRafRef,
   };

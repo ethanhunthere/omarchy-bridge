@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { Modal, Platform, Text, TouchableOpacity, View } from 'react-native';
+import { Modal, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useThemedStyles } from '../theme/ThemeProvider';
 import { ThemeTokens } from '../theme/palettes';
 import { ConfirmModalState } from '../hooks/useBridge';
@@ -26,13 +26,14 @@ export default memo(function ConfirmModal({
     >
       <View style={styles.modalBackdrop}>
         <View style={styles.dialogCard}>
-          <Text style={[styles.dialogTitle, state.isDanger && styles.textRed]} testID="modal-title">
-            {state.title}
-          </Text>
-          <Text style={styles.dialogMessage} testID="modal-description">
-            {state.description}
-          </Text>
-
+          <ScrollView style={styles.dialogScroll} contentContainerStyle={styles.dialogScrollContent}>
+            <Text style={[styles.dialogTitle, state.isDanger && styles.textRed]} testID="modal-title">
+              {state.title}
+            </Text>
+            <Text style={styles.dialogMessage} testID="modal-description">
+              {state.description}
+            </Text>
+          </ScrollView>
           <View style={styles.dialogActions}>
             <TouchableOpacity
               style={styles.dialogBtnSecondary}
@@ -75,6 +76,13 @@ const makeStyles = (t: ThemeTokens) =>
       width: '100%',
       maxWidth: 420,
       maxHeight: '82%',
+    },
+    dialogScroll: {
+      flexGrow: 0,
+      flexShrink: 1,
+    },
+    dialogScrollContent: {
+      paddingBottom: 2,
     },
     dialogTitle: {
       fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',

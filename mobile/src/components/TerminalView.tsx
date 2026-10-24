@@ -1,5 +1,6 @@
-import React, { memo, useCallback, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import React, { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -121,7 +122,7 @@ const TerminalLine = memo(function TerminalLine({
   styles: Styles;
 }) {
   return (
-    <Text style={styles.terminalLine} selectable>
+    <Text style={styles.terminalLine} selectable allowFontScaling={false}>
       {getCachedStyledLine(themeId, line, styles)}
     </Text>
   );
@@ -163,6 +164,7 @@ const TerminalBody = memo(function TerminalBody({
       parsedSegments.map((seg, idx) => (
         <Text
           key={idx}
+          allowFontScaling={false}
           style={{
             color: seg.color || theme.terminalText,
             fontWeight: seg.bold ? '700' : '400',
@@ -183,7 +185,7 @@ const TerminalBody = memo(function TerminalBody({
       style={styles.terminalViewport}
       contentContainerStyle={styles.terminalContent}
       keyboardShouldPersistTaps="handled"
-      keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+      keyboardDismissMode="none"
       onContentSizeChange={() => {
         if (autoScroll) onContentSizeChange();
       }}
@@ -231,7 +233,9 @@ const KeycapRibbon = memo(function KeycapRibbon({
       accessibilityRole="button"
       accessibilityLabel={label}
     >
-      <Text style={[styles.keycapText, extraTextStyle]}>{label}</Text>
+      <Text style={[styles.keycapText, extraTextStyle]} allowFontScaling={false}>
+        {label}
+      </Text>
     </TouchableOpacity>
   );
 
@@ -270,7 +274,8 @@ const TerminalInput = React.forwardRef<TerminalInputHandle, {
   status: ConnectionStatus;
   onSend: (command: string) => void;
   onFocused: () => void;
-}>(function TerminalInput({ status, onSend, onFocused }, ref) {
+  onBlurred: () => void;
+}>(function TerminalInput({ status, onSend, onFocused, onBlurred }, ref) {
   const styles = useThemedStyles(makeStyles);
   const { theme } = useTheme();
   const inputRef = useRef<TextInput>(null);
@@ -300,8 +305,9 @@ const TerminalInput = React.forwardRef<TerminalInputHandle, {
   };
 
   return (
-    <View style={[styles.inputBar, focused && styles.inputBarFocused]}>
-      <Text style={[styles.promptChar, focused && styles.promptCharFocused]}>❯</Text>
+    <View style={[styles.inputBar, focused && styles.inputBarFocused]}>      <Text style={[styles.promptChar, focused && styles.promptCharFocused]} allowFontScaling={false}>
+        ❯
+      </Text>
       <TextInput
         ref={inputRef}
         style={[styles.inputField, focused && styles.inputFieldFocused]}
@@ -311,17 +317,23 @@ const TerminalInput = React.forwardRef<TerminalInputHandle, {
           setFocused(true);
           onFocused();
         }}
-        onBlur={() => setFocused(false)}
+        onBlur={() => {
+          setFocused(false);
+          onBlurred();
+        }}
         placeholder="Type command or prompt..."
         placeholderTextColor={theme.textMuted}
         autoCapitalize="none"
         autoCorrect={false}
         spellCheck={false}
+        allowFontScaling={false}
         keyboardAppearance="dark"
         returnKeyType="send"
+        submitBehavior="submit"
         onSubmitEditing={handleSend}
         textContentType="none"
         autoComplete="off"
+        importantForAutofill="no"
       />
       {hasText && (
         <TouchableOpacity
@@ -333,7 +345,7 @@ const TerminalInput = React.forwardRef<TerminalInputHandle, {
           accessibilityRole="button"
           accessibilityLabel="Clear input"
         >
-          <Text style={styles.clearInputText}>✕</Text>
+          <Text style={styles.clearInputText} allowFontScaling={false}>✕</Text>
         </TouchableOpacity>
       )}
       <TouchableOpacity
@@ -342,7 +354,10 @@ const TerminalInput = React.forwardRef<TerminalInputHandle, {
         accessibilityRole="button"
         accessibilityLabel={hasText ? 'Send command' : 'Send enter'}
       >
-        <Text style={[styles.sendBtnText, status !== 'connected' && styles.sendBtnTextDisabled]}>
+        <Text
+          style={[styles.sendBtnText, status !== 'connected' && styles.sendBtnTextDisabled]}
+          allowFontScaling={false}
+        >
           {hasText ? 'SEND' : '↵'}
         </Text>
       </TouchableOpacity>
@@ -356,13 +371,13 @@ const TerminalInput = React.forwardRef<TerminalInputHandle, {
 export default function TerminalView({ bridge }: { bridge: BridgeController }) {
   const styles = useThemedStyles(makeStyles);
   const inputHandleRef = useRef<TerminalInputHandle>(null);
+  const [inputFocused, setInputFocused] = useState(false);
   const {
     screenLines,
     terminalText,
     autoScroll,
     setAutoScroll,
     status,
-    handleTerminalPress,
     sendCommand,
     sendSignal,
     clearScreen,
@@ -381,6 +396,25 @@ export default function TerminalView({ bridge }: { bridge: BridgeController }) {
     });
   }, [scrollRafRef, scrollViewRef]);
 
+  // Keyboard insets land after a layout pass; pin to the newest line then.
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', () => {
+      if (autoScroll) scrollViewRef.current?.scrollToEnd({ animated: true });
+    });
+    return () => show.remove();
+  }, [autoScroll, scrollViewRef]);
+
+  // Tap the output: open the keyboard, or close it if it is already up.
+  const onTerminalPress = useCallback(() => {
+    if (inputFocused) {
+      Keyboard.dismiss();
+    } else {
+      inputHandleRef.current?.focus();
+    }
+  }, [inputFocused]);
+  const onInputFocused = useCallback(() => setInputFocused(true), []);
+  const onInputBlurred = useCallback(() => setInputFocused(false), []);
+
   const onToggleAutoScroll = useCallback(() => setAutoScroll((p) => !p), [setAutoScroll]);
   const onHistory = useCallback(
     (direction: 'up' | 'down') => {
@@ -394,16 +428,13 @@ export default function TerminalView({ bridge }: { bridge: BridgeController }) {
     inputHandleRef.current?.setValue('agy');
     inputHandleRef.current?.focus();
   }, []);
-  const onInputFocused = useCallback(() => {
-    if (autoScroll) {
-      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 150);
-    }
-  }, [autoScroll, scrollViewRef]);
 
   return (
     <KeyboardAvoidingView
       style={styles.flexOne}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      // Android uses softwareKeyboardLayoutMode="resize": the window already
+      // shrinks, so adding KAV height on top would double-compress the view.
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={0}
     >
       <View style={styles.flexOne}>
@@ -411,7 +442,7 @@ export default function TerminalView({ bridge }: { bridge: BridgeController }) {
           screenLines={screenLines}
           terminalText={terminalText}
           autoScroll={autoScroll}
-          onPress={handleTerminalPress}
+          onPress={onTerminalPress}
           onContentSizeChange={onContentSizeChange}
           scrollViewRef={scrollViewRef}
         />
@@ -423,7 +454,13 @@ export default function TerminalView({ bridge }: { bridge: BridgeController }) {
           onClear={clearScreen}
           onPrefill={onPrefill}
         />
-        <TerminalInput ref={inputHandleRef} status={status} onSend={sendCommand} onFocused={onInputFocused} />
+        <TerminalInput
+          ref={inputHandleRef}
+          status={status}
+          onSend={sendCommand}
+          onFocused={onInputFocused}
+          onBlurred={onInputBlurred}
+        />
       </View>
     </KeyboardAvoidingView>
   );
