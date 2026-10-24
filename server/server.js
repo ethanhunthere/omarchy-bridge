@@ -14,7 +14,9 @@ const { WebSocketServer, WebSocket } = require('ws');
 const { Terminal: HeadlessTerminal } = require('@xterm/headless');
 const { SerializeAddon } = require('@xterm/addon-serialize');
 const { startMdns, stopMdns } = require('./mdns');
-const { getTailscaleStatus } = require('./tailscale');
+// Tailscale remote transport is kept for power users but disabled by default.
+// const { getTailscaleStatus } = require('./tailscale');
+const { startTunnel, stopTunnel, getTunnelInfo } = require('./tunnel');
 const auth = require('./auth');
 require('dotenv').config();
 
@@ -1009,6 +1011,7 @@ wss.on('connection', (ws, req) => {
 
   // Send fast initial snapshot (max 32KB so launch is instant)
   const initialHistory = getRecentScrollback(32768);
+  const tunnelInfo = getTunnelInfo();
   ws.send(
     JSON.stringify({
       type: 'init',
@@ -1019,7 +1022,10 @@ wss.on('connection', (ws, req) => {
       lines: getCleanScreenLines(120),
       history: initialHistory,
       telemetry: getLightTelemetry(),
-      remote: getTailscaleStatus(),
+      remote: {
+        tunnelUrl: tunnelInfo.url,
+        tunnelMode: tunnelInfo.mode,
+      },
     }),
     (err) => {
       if (err) cleanupClient();
@@ -1134,7 +1140,7 @@ wss.on('connection', (ws, req) => {
 // ==========================================
 server.listen(PORT, HOST, () => {
   const lanIp = getPrimaryLanIp();
-  const tailscale = getTailscaleStatus();
+  const tunnel = getTunnelInfo();
   const pairingCode = auth.newPairingCode();
   const pairedCount = auth.deviceCount();
   console.log(`\n============================================================`);
@@ -1142,11 +1148,10 @@ server.listen(PORT, HOST, () => {
   console.log(` Session: ${TMUX_SESSION} | Shell: ${USER_SHELL} -l`);
   console.log(` LAN Endpoint:    ws://${lanIp}:${PORT}`);
   console.log(` mDNS Endpoint:   ws://omarchy-bridge.local:${PORT}`);
-  if (tailscale.available || tailscale.magicDns) {
-    const remoteHost = tailscale.magicDns || tailscale.ip;
-    console.log(` Tailscale:       ws://${remoteHost}:${PORT}`);
+  if (tunnel.available) {
+    console.log(` Tunnel:          wss://${tunnel.url.replace(/^https:\/\//, '')} (${tunnel.mode})`);
   } else {
-    console.log(` Tailscale:       not detected (install/enable tailscale for remote access)`);
+    console.log(` Tunnel:          not configured (set TUNNEL_URL or TUNNEL_MODE=quick in .env)`);
   }
   console.log(` Paired devices:  ${pairedCount}`);
   console.log(`------------------------------------------------------------`);
@@ -1154,6 +1159,7 @@ server.listen(PORT, HOST, () => {
   console.log(`   Valid 10 minutes. The most recent code in this log is the live one.`);
   console.log(`============================================================\n`);
   startMdns(PORT);
+  startTunnel(PORT);
 
   // Keep a fresh pairing code available at all times without restarts.
   setInterval(() => {
@@ -1166,6 +1172,7 @@ server.listen(PORT, HOST, () => {
 
 function cleanup() {
   stopMdns(PORT);
+  stopTunnel();
   if (keepAwakeProcess) {
     try {
       keepAwakeProcess.kill();

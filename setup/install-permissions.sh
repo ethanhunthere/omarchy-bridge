@@ -58,4 +58,14 @@ sudo tailscale set --operator="${SUDO_USER:-$USER}" 2>/dev/null || true
 echo "[!] Run 'sudo tailscale up' once, then log in with same account on phone."
 echo "[!] Remote endpoint appears in: journalctl --user -u omarchy-bridge -f"
 
+# 5. Cloudflare Tunnel (primary remote transport)
+if ! which cloudflared >/dev/null 2>&1; then
+    echo "[!] cloudflared not installed. Arch: sudo pacman -S cloudflared"
+    echo "[!] Then either: cloudflared tunnel login && create a named tunnel +"
+    echo "[!] TUNNEL_URL=https://your.hostname in server/.env (stable, recommended),"
+    echo "[!] or set TUNNEL_MODE=quick in server/.env for a random test URL."
+else
+    echo "[+] cloudflared found. Set TUNNEL_URL or TUNNEL_MODE=quick in server/.env"
+fi
+
 echo "=== Permissions & System Services Configured Successfully ==="

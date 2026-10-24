@@ -13,7 +13,11 @@
         "NSLocalNetworkUsageDescription": "Omarchy Bridge connects to your PC on the local network to stream the terminal and control power.",
         "NSBonjourServices": [
           "_omarchy-bridge._tcp"
-        ]
+        ],
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": true,
+          "NSAllowsLocalNetworking": true
+        }
       }
     },
     "android": {

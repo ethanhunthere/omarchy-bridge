@@ -71,6 +71,41 @@ function normalizeBridgeHost(raw: string): string {
   return host;
 }
 
+// Accepts both local hosts ("192.168.1.5", "omarchy-bridge.local") and
+// remote tunnel URLs ("https://xxx.trycloudflare.com", "wss://...").
+function normalizeBridgeValue(raw: string): string {
+  const value = (raw || '').trim();
+  if (/^https?:\/\//i.test(value) || /^wss?:\/\//i.test(value)) {
+    const host = value.replace(/^(https?|wss?):\/\//i, '').split('/')[0];
+    return host ? `https://${host}` : '';
+  }
+  return normalizeBridgeHost(value);
+}
+
+interface BridgeTarget {
+  kind: 'tunnel' | 'local';
+  host: string;
+  httpOrigin: string;
+  wsUrl: string;
+  storageValue: string;
+}
+
+function toBridgeTarget(value: string): BridgeTarget | null {
+  const normalized = normalizeBridgeValue(value);
+  if (!normalized) return null;
+  if (normalized.startsWith('https://')) {
+    const host = normalized.slice('https://'.length);
+    return { kind: 'tunnel', host, httpOrigin: normalized, wsUrl: `wss://${host}`, storageValue: normalized };
+  }
+  return {
+    kind: 'local',
+    host: normalized,
+    httpOrigin: `http://${normalized}:${BRIDGE_PORT}`,
+    wsUrl: `ws://${normalized}:${BRIDGE_PORT}`,
+    storageValue: normalized,
+  };
+}
+
 function readSavedBridgeHost(): string {
   try {
     const file = new File(Paths.document, BRIDGE_HOST_FILENAME);
@@ -92,7 +127,7 @@ function readSavedRemoteHost(): string {
   try {
     const file = new File(Paths.document, REMOTE_HOST_FILENAME);
     if (!file.exists) return '';
-    return normalizeBridgeHost(file.textSync());
+    return (file.textSync() || '').trim();
   } catch (e) {
     return '';
   }
@@ -105,15 +140,17 @@ function persistRemoteHost(host: string): void {
   } catch (e) {}
 }
 
-function resolveCandidateHosts(savedHost = '', remoteHost = ''): string[] {
-  const hosts: string[] = [];
+// Candidate order: user override -> Cloudflare tunnel (primary remote path)
+// -> dev host -> mDNS. Tailscale stays a commented server-side option.
+function resolveCandidateTargets(savedHost = '', remoteHost = '', manualHost = ''): BridgeTarget[] {
+  const targets: BridgeTarget[] = [];
   const add = (candidate?: string | null) => {
-    if (!candidate) return;
-    const host = normalizeBridgeHost(candidate);
-    if (host && !hosts.includes(host)) hosts.push(host);
+    const target = toBridgeTarget(candidate || '');
+    if (target && !targets.some((t) => t.wsUrl === target.wsUrl)) targets.push(target);
   };
 
   add(savedHost);
+  add(remoteHost);
 
   const extraHost = (Constants.expoConfig?.extra as { bridgeHost?: string } | undefined)?.bridgeHost;
   add(extraHost);
@@ -132,8 +169,8 @@ function resolveCandidateHosts(savedHost = '', remoteHost = ''): string[] {
   }
 
   add(DEFAULT_BRIDGE_HOST);
-  add(remoteHost);
-  return hosts;
+  add(manualHost);
+  return targets;
 }
 
 // ==========================================
@@ -416,7 +453,6 @@ export default function App() {
   const [deviceToken, setDeviceToken] = useState<string>('');
   const deviceTokenRef = useRef<string>('');
   const [pairCodeInput, setPairCodeInput] = useState('');
-  const [deviceNameInput, setDeviceNameInput] = useState('iPhone');
   const [pairing, setPairing] = useState(false);
   const [pairError, setPairError] = useState('');
 
@@ -539,10 +575,10 @@ export default function App() {
       return;
     }
 
-    const candidateHosts = resolveCandidateHosts(savedHostRef.current, savedRemoteHostRef.current);
-    const currentHost = candidateHosts[hostIndexRef.current % candidateHosts.length] || DEFAULT_BRIDGE_HOST;
+    const candidateTargets = resolveCandidateTargets(savedHostRef.current, savedRemoteHostRef.current);
+    const target = candidateTargets[hostIndexRef.current % candidateTargets.length];
     // Credential travels in the WebSocket subprotocol header, never in the URL.
-    const targetUrl = `ws://${currentHost}:${BRIDGE_PORT}`;
+    const targetUrl = target ? target.wsUrl : `ws://${DEFAULT_BRIDGE_HOST}:${BRIDGE_PORT}`;
     const protocols = [`omarchy-bridge.${deviceTokenRef.current}`];
 
     setStatus('connecting');
@@ -580,11 +616,11 @@ export default function App() {
             if (msg.history) setTerminalText(msg.history);
             if (msg.telemetry) setTelemetry(msg.telemetry);
             if (msg.remote) {
-              const remoteHost = normalizeBridgeHost(msg.remote.magicDns || msg.remote.ip || '');
-              if (remoteHost && remoteHost !== savedRemoteHostRef.current) {
-                persistRemoteHost(remoteHost);
-                savedRemoteHostRef.current = remoteHost;
-                setSavedRemoteHost(remoteHost);
+              const remoteValue = normalizeBridgeValue(msg.remote.tunnelUrl || msg.remote.magicDns || msg.remote.ip || '');
+              if (remoteValue && remoteValue !== savedRemoteHostRef.current) {
+                persistRemoteHost(remoteValue);
+                savedRemoteHostRef.current = remoteValue;
+                setSavedRemoteHost(remoteValue);
               }
             }
           } else if (msg.type === 'output') {
@@ -644,12 +680,18 @@ export default function App() {
   }, []);
 
   const applyBridgeHost = useCallback(() => {
-    const host = normalizeBridgeHost(hostInput);
-    if (!host) return;
+    const value = normalizeBridgeValue(hostInput);
+    if (!value) return;
 
-    persistBridgeHost(host);
-    savedHostRef.current = host;
-    setSavedHost(host);
+    if (value.startsWith('https://')) {
+      persistRemoteHost(value);
+      savedRemoteHostRef.current = value;
+      setSavedRemoteHost(value);
+    } else {
+      persistBridgeHost(value);
+      savedHostRef.current = value;
+      setSavedHost(value);
+    }
     setHostModalVisible(false);
     hostIndexRef.current = 0;
     Keyboard.dismiss();
@@ -679,7 +721,7 @@ export default function App() {
 
   const pairDevice = useCallback(async () => {
     const code = pairCodeInput.trim();
-    const name = deviceNameInput.trim() || 'iPhone';
+    const name = Constants.deviceName || 'iPhone';
     if (!/^\d{6}$/.test(code)) {
       setPairError('Enter the 6-digit code from the server log');
       return;
@@ -687,13 +729,16 @@ export default function App() {
     setPairing(true);
     setPairError('');
 
-    const manualHost = normalizeBridgeHost(hostInput);
-    const hosts = resolveCandidateHosts(savedHostRef.current, savedRemoteHostRef.current);
-    if (manualHost && !hosts.includes(manualHost)) hosts.unshift(manualHost);
+    const targets: BridgeTarget[] = [];
+    const manualTarget = toBridgeTarget(hostInput);
+    if (manualTarget) targets.push(manualTarget);
+    for (const candidate of resolveCandidateTargets(savedHostRef.current, savedRemoteHostRef.current)) {
+      if (!targets.some((t) => t.wsUrl === candidate.wsUrl)) targets.push(candidate);
+    }
     let sawRejection = false;
-    for (const host of hosts) {
+    for (const target of targets) {
       try {
-        const res = await fetchWithTimeout(`http://${host}:${BRIDGE_PORT}/api/pair`, 4000, {
+        const res = await fetchWithTimeout(`${target.httpOrigin}/api/pair`, 4000, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code, name }),
@@ -712,9 +757,15 @@ export default function App() {
           await persistDeviceToken(data.token);
           deviceTokenRef.current = data.token;
           setDeviceToken(data.token);
-          persistBridgeHost(host);
-          savedHostRef.current = host;
-          setSavedHost(host);
+          if (target.kind === 'tunnel') {
+            persistRemoteHost(target.storageValue);
+            savedRemoteHostRef.current = target.storageValue;
+            setSavedRemoteHost(target.storageValue);
+          } else {
+            persistBridgeHost(target.storageValue);
+            savedHostRef.current = target.storageValue;
+            setSavedHost(target.storageValue);
+          }
           setPairCodeInput('');
           setPairError('');
           setPairing(false);
@@ -731,9 +782,9 @@ export default function App() {
     setPairError(
       sawRejection
         ? 'Wrong or expired code. Grab the newest code from the PC log.'
-        : `Could not reach the bridge (${hosts[0]}). Same Wi-Fi as the PC? If mDNS is blocked, set Bridge Host to the PC's LAN IP above and tap Pair Device again.`
+        : `Could not reach the bridge (${targets[0]?.host || DEFAULT_BRIDGE_HOST}). Set Bridge Host to the PC's LAN IP (same Wi-Fi) or your tunnel URL, then tap Pair Device again.`
     );
-  }, [connect, pairCodeInput, deviceNameInput, hostInput]);
+  }, [connect, pairCodeInput, hostInput]);
 
   const unpairDevice = useCallback(() => {
     clearDeviceToken();
@@ -1213,24 +1264,29 @@ export default function App() {
 
       {/* Bridge Host Editor */}
       <Modal visible={hostModalVisible} transparent animationType="fade" testID="host-modal">
-        <TouchableOpacity
-          style={styles.modalBackdrop}
-          activeOpacity={1}
-          testID="host-backdrop"
-          onPress={Keyboard.dismiss}
+        <KeyboardAvoidingView
+          style={styles.modalKav}
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         >
-          <View
-            style={styles.dialogCard}
-            onStartShouldSetResponder={() => {
-              Keyboard.dismiss();
-              return true;
-            }}
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            testID="host-backdrop"
+            onPress={Keyboard.dismiss}
           >
-            <ScrollView
-              style={styles.dialogScroll}
-              contentContainerStyle={styles.dialogScrollContent}
-              keyboardShouldPersistTaps="handled"
+            <View
+              style={styles.dialogCard}
+              onStartShouldSetResponder={() => {
+                Keyboard.dismiss();
+                return true;
+              }}
             >
+              <ScrollView
+                style={styles.dialogScroll}
+                contentContainerStyle={styles.dialogScrollContent}
+                keyboardShouldPersistTaps="handled"
+                automaticallyAdjustKeyboardInsets
+              >
               <Text style={styles.dialogTitle}>Bridge Host</Text>
               <Text style={styles.dialogMessage}>
                 Auto-discovers the PC as "{DEFAULT_BRIDGE_HOST}". If your network blocks mDNS, enter the PC's LAN IP.
@@ -1266,19 +1322,6 @@ export default function App() {
                   <Text style={styles.dialogTitle}>Pair This Device</Text>
                   <Text style={styles.dialogMessage}>Get the newest code from the PC terminal:</Text>
                   <Text style={styles.commandBlock}>journalctl --user -u omarchy-bridge | grep PAIRING</Text>
-                  <Text style={styles.fieldLabel}>Device name</Text>
-                  <TextInput
-                    style={[styles.hostInput, styles.fieldInput]}
-                    value={deviceNameInput}
-                    onChangeText={setDeviceNameInput}
-                    placeholder="iPhone"
-                    placeholderTextColor="#52525b"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    maxLength={40}
-                    keyboardAppearance="dark"
-                    testID="pair-name-input"
-                  />
                   <Text style={styles.fieldLabel}>Pairing code</Text>
                   <TextInput
                     style={[styles.hostInput, styles.fieldInput]}
@@ -1326,6 +1369,7 @@ export default function App() {
             </View>
           </View>
         </TouchableOpacity>
+        </KeyboardAvoidingView>
       </Modal>
 
       {/* Industrial Minimal Confirmation Dialog */}
@@ -1843,6 +1887,9 @@ const styles = StyleSheet.create({
   },
 
   // Modal
+  modalKav: {
+    flex: 1,
+  },
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.75)',

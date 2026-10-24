@@ -12,7 +12,7 @@
 
 ## ⚡ What is Omarchy Bridge?
 
-**Omarchy Bridge** pairs an invisible, background Linux daemon with an Expo (React Native) mobile app. It gives power users instant, secure command-line access and full hardware control over their Linux PC (specifically optimized for Arch Linux, Omarchy, and Hyprland) from an iPhone or Android device anywhere in the world over local Wi-Fi or [Tailscale](https://tailscale.com/).
+**Omarchy Bridge** pairs an invisible, background Linux daemon with an Expo (React Native) mobile app. It gives power users instant, secure command-line access and full hardware control over their Linux PC (specifically optimized for Arch Linux, Omarchy, and Hyprland) from an iPhone or Android device anywhere in the world over local Wi-Fi or a [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/) (Tailscale mesh support is built in, commented out by default).
 
 ### 📱 Why Not Just Use Traditional Mobile SSH?
 
@@ -43,7 +43,7 @@
                            │
              Encrypted WebSocket (:19001) / REST API
              Auth: Pre-Shared Key (Token)
-             Transport: Local LAN or Tailscale WireGuard Mesh
+             Transport: Local LAN or Cloudflare Tunnel (wss)
                            │
 ┌──────────────────────────▼─────────────────────────────┐
 │                 Linux Host PC (Omarchy)                │
@@ -76,7 +76,8 @@
 
 - **Node.js** 20+ LTS
 - **tmux**
-- **Tailscale** (optional, recommended for worldwide remote access)
+- **[cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)** (primary remote access: `sudo pacman -S cloudflared`, then `TUNNEL_URL` or `TUNNEL_MODE=quick` in `server/.env`)
+- **Tailscale** (optional power-user transport, disabled by default in `server/server.js`)
 
 ### 2. Install & Start Backend Daemon
 
@@ -238,7 +239,7 @@ TOTAL TRACKS: 19 | PASSED: 19 | FAILED: 0 (100% Pass Rate)
 3. **Revocation & Audit:** `GET /api/devices` + `POST /api/devices/revoke` (master key) drop access instantly; every pairing, auth failure, revocation, and connection is appended to `~/.config/omarchy-bridge/audit.log`.
 4. **Master Key Hygiene:** `server/.env` `AUTH_TOKEN` is a random 256-bit admin key generated per install (`setup/install-permissions.sh`). It is only needed for device management and scripts — never shipped in the app.
 5. **Timing-Safe Verification:** All token comparisons use constant-time equality; failed attempts per IP are rate-limited and locked out.
-6. **Network Perimeter:** Bind the daemon to your LAN and/or Tailscale mesh; never port-forward it to the public internet. Tailscale traffic is WireGuard-encrypted end to end.
+6. **Network Perimeter:** Remote access goes through a Cloudflare Tunnel (`cloudflared` dials out; no inbound ports, no port-forwarding). Traffic is TLS (`wss://`) with per-device token auth on top. Set `TUNNEL_URL` for a stable named-tunnel hostname (recommended) or `TUNNEL_MODE=quick` for a random test URL. For an identity gate, front the tunnel with a Cloudflare Access policy. Tailscale (WireGuard, E2E) remains available as a commented-out transport in `server/server.js`.
 7. **Passwordless Polkit / Sudoers:** High-privilege power actions (`systemctl poweroff`, `reboot`, `suspend`) use non-blocking flags (`--no-ask-password` and `sudo -n`) scoped strictly to root binaries in `/etc/sudoers.d/omarchy-bridge` and `/etc/polkit-1/rules.d/50-omarchy-bridge.rules`.
 8. **Desktop Stealth Protection:** Activating Stealth Mode cuts the physical display while keeping the session securely locked.
 
