@@ -1198,8 +1198,19 @@ export default function App() {
 
       {/* Bridge Host Editor */}
       <Modal visible={hostModalVisible} transparent animationType="fade" testID="host-modal">
-        <View style={styles.modalBackdrop}>
-          <View style={styles.dialogCard}>
+        <TouchableOpacity
+          style={styles.modalBackdrop}
+          activeOpacity={1}
+          testID="host-backdrop"
+          onPress={Keyboard.dismiss}
+        >
+          <View
+            style={styles.dialogCard}
+            onStartShouldSetResponder={() => {
+              Keyboard.dismiss();
+              return true;
+            }}
+          >
             <Text style={styles.dialogTitle}>Bridge Host</Text>
             <Text style={styles.dialogMessage}>
               Leave as "{DEFAULT_BRIDGE_HOST}" to discover your PC automatically over Wi-Fi. If mDNS is blocked on your
@@ -1236,14 +1247,19 @@ export default function App() {
             ) : (
               <View>
                 <Text style={styles.dialogTitle}>Pair This Device</Text>
+                <Text style={styles.dialogMessage}>Run this in the PC terminal:</Text>
+                <Text style={styles.commandBlock}>journalctl --user -u omarchy-bridge | grep PAIRING</Text>
                 <Text style={styles.dialogMessage}>
-                  On the PC run: journalctl --user -u omarchy-bridge | grep PAIRING. Enter the 6-digit code below. It
-                  expires after 5 minutes.
+                  Enter the most recent 6-digit code below. Codes are valid for 10 minutes.
                 </Text>
                 <TextInput
                   style={styles.hostInput}
                   value={pairCodeInput}
-                  onChangeText={setPairCodeInput}
+                  onChangeText={(text) => {
+                    const cleaned = text.replace(/\D/g, '').slice(0, 6);
+                    setPairCodeInput(cleaned);
+                    if (cleaned.length === 6) Keyboard.dismiss();
+                  }}
                   placeholder="6-digit code"
                   placeholderTextColor="#52525b"
                   keyboardType="number-pad"
@@ -1289,7 +1305,7 @@ export default function App() {
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
 
       {/* Industrial Minimal Confirmation Dialog */}
@@ -1911,6 +1927,18 @@ const styles = StyleSheet.create({
     fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
     fontSize: 11,
     color: '#ef4444',
+    marginBottom: 12,
+  },
+  commandBlock: {
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    fontSize: 11,
+    color: '#d4d4d8',
+    backgroundColor: '#0d0f14',
+    borderWidth: 1,
+    borderColor: '#262936',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     marginBottom: 12,
   },
 

@@ -786,7 +786,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       console.log(`[PAIR] Device paired: ${result.name} (${result.deviceId}) from ${clientIp}`);
-      console.log(`[PAIR] New one-time code: ${result.nextCode}`);
+      console.log(` PAIRING CODE:    ${result.nextCode}`);
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ token: result.token, deviceId: result.deviceId, name: result.name }));
     });
@@ -1151,9 +1151,7 @@ server.listen(PORT, HOST, () => {
   console.log(` Paired devices:  ${pairedCount}`);
   console.log(`------------------------------------------------------------`);
   console.log(` PAIRING CODE:    ${pairingCode}`);
-  console.log(`   Enter this code in the app within 5 minutes.`);
-  console.log(`   A new code appears in this log after each successful pairing.`);
-  console.log(`   View anytime:  journalctl --user -u omarchy-bridge | grep PAIRING`);
+  console.log(`   Valid 10 minutes. The most recent code in this log is the live one.`);
   console.log(`============================================================\n`);
   startMdns(PORT);
 
@@ -1161,7 +1159,7 @@ server.listen(PORT, HOST, () => {
   setInterval(() => {
     if (!auth.activePairingCode()) {
       const code = auth.newPairingCode();
-      console.log(`[PAIR] New one-time code: ${code} (valid 5 min)`);
+      console.log(` PAIRING CODE:    ${code}`);
     }
   }, 60000).unref();
 });

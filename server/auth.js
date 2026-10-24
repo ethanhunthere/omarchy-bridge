@@ -20,7 +20,7 @@ const CONFIG_DIR = process.env.OMARCHY_BRIDGE_CONFIG_DIR || path.join(os.homedir
 const DEVICES_FILE = path.join(CONFIG_DIR, 'devices.json');
 const AUDIT_FILE = path.join(CONFIG_DIR, 'audit.log');
 
-const PAIRING_CODE_TTL_MS = 5 * 60 * 1000;
+const PAIRING_CODE_TTL_MS = 10 * 60 * 1000;
 const PAIRING_MAX_ATTEMPTS_PER_MIN = 10;
 const LAST_SEEN_PERSIST_INTERVAL_MS = 60 * 1000;
 
