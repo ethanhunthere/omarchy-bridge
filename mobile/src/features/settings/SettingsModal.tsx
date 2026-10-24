@@ -13,9 +13,9 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useTheme, useThemedStyles } from '../theme/ThemeProvider';
-import { ThemeTokens } from '../theme/palettes';
-import { DEFAULT_BRIDGE_HOST } from '../lib/bridge';
+import { useTheme, useThemedStyles } from '../../shared/theme';
+import { ThemeTokens } from '../../shared/theme';
+import { DEFAULT_BRIDGE_HOST } from '../../entities/bridge';
 
 // iOS animates the inset in step with the keyboard; Android lets the dialog
 // KeyboardAvoidingView shrink instead.

@@ -1,8 +1,8 @@
 import React, { memo } from 'react';
 import { Modal, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { useThemedStyles } from '../theme/ThemeProvider';
-import { ThemeTokens } from '../theme/palettes';
-import { ConfirmModalState } from '../hooks/useBridge';
+import { useThemedStyles } from '../../shared/theme';
+import { ThemeTokens } from '../../shared/theme';
+import { ConfirmModalState } from '../../entities/bridge';
 
 export default memo(function ConfirmModal({
   state,

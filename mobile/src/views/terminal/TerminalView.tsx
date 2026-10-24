@@ -11,10 +11,14 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useTheme, useThemedStyles } from '../theme/ThemeProvider';
-import { ThemeTokens } from '../theme/palettes';
-import { parseAnsi, StyledSegment } from '../lib/ansi';
-import { BridgeController, ConnectionStatus } from '../hooks/useBridge';
+import { useTheme, useThemedStyles } from '../../shared/theme';
+import { ThemeTokens } from '../../shared/theme';
+import {
+  BridgeController,
+  ConnectionStatus,
+  parseAnsi,
+  StyledSegment,
+} from '../../entities/bridge';
 
 type Styles = ReturnType<typeof makeStyles>;
 

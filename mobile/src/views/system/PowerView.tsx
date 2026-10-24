@@ -1,8 +1,8 @@
 import React from 'react';
 import { Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
-import { useTheme, useThemedStyles } from '../theme/ThemeProvider';
-import { ThemeTokens, THEMES } from '../theme/palettes';
-import { BridgeController } from '../hooks/useBridge';
+import { useTheme, useThemedStyles } from '../../shared/theme';
+import { ThemeTokens, THEMES } from '../../shared/theme';
+import { BridgeController } from '../../entities/bridge';
 
 export default function PowerView({ bridge }: { bridge: BridgeController }) {
   const styles = useThemedStyles(makeStyles);

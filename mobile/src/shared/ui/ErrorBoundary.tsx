@@ -1,8 +1,8 @@
 import React from 'react';
 import { Platform, StatusBar, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme, useThemedStyles } from '../theme/ThemeProvider';
-import { ThemeTokens } from '../theme/palettes';
+import { useTheme, useThemedStyles } from '../theme';
+import { ThemeTokens } from '../theme';
 
 interface ErrorBoundaryState {
   hasError: boolean;

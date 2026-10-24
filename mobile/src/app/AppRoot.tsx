@@ -1,15 +1,15 @@
 import React from 'react';
 import { StatusBar, View } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import ErrorBoundary from './components/ErrorBoundary';
-import HeaderBar from './components/HeaderBar';
-import TerminalView from './components/TerminalView';
-import PowerView from './components/PowerView';
-import SettingsModal from './components/SettingsModal';
-import ConfirmModal from './components/ConfirmModal';
-import { ThemeProvider, useTheme, useThemedStyles } from './theme/ThemeProvider';
-import { ThemeTokens } from './theme/palettes';
-import { useBridge } from './hooks/useBridge';
+import { ErrorBoundary } from '../shared/ui';
+import { HeaderBar } from '../widgets/header';
+import { TerminalView } from '../views/terminal';
+import { PowerView } from '../views/system';
+import { SettingsModal } from '../features/settings';
+import { ConfirmModal } from '../features/confirm';
+import { ThemeProvider, useTheme, useThemedStyles } from '../shared/theme';
+import { ThemeTokens } from '../shared/theme';
+import { useBridge } from '../entities/bridge';
 
 function ThemedApp() {
   const bridge = useBridge();

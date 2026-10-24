@@ -4,4 +4,4 @@
 //   src/components/*       — dumb views (header, terminal, power, modals)
 //   src/lib/*              — bridge targets, ANSI parser
 //   src/theme/*            — selectable palette tokens + provider
-export { default } from './src/AppRoot';
+export { default } from './src/app';

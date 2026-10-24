@@ -1,8 +1,8 @@
 import React, { memo } from 'react';
 import { Platform, Text, TouchableOpacity, View } from 'react-native';
-import { useTheme, useThemedStyles } from '../theme/ThemeProvider';
-import { ThemeTokens } from '../theme/palettes';
-import { ConnectionStatus } from '../hooks/useBridge';
+import { useTheme, useThemedStyles } from '../../shared/theme';
+import { ThemeTokens } from '../../shared/theme';
+import { ConnectionStatus } from '../../entities/bridge';
 
 const ConnectionPill = memo(function ConnectionPill({
   latency,

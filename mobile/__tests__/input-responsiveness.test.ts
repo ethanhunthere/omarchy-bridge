@@ -43,14 +43,14 @@ describe('Agent 3: TextInput & Typing Responsiveness Test Suite', () => {
     test('text uses theme primary token backed by high-contrast white (#ffffff)', () => {
       const match = code.match(/inputField:\s*\{[^}]*color:\s*t\.textPrimary/s);
       expect(match).not.toBeNull();
-      const palette = fs.readFileSync(path.resolve(__dirname, '../src/theme/palettes.ts'), 'utf-8');
+      const palette = fs.readFileSync(path.resolve(__dirname, '../src/shared/theme/palettes.ts'), 'utf-8');
       expect(palette.includes("textPrimary: '#ffffff'")).toBe(true);
     });
 
     test('input background uses theme inputBg token backed by dark high-contrast surface (#161820)', () => {
       const match = code.match(/inputField:\s*\{[^}]*backgroundColor:\s*t\.inputBg/s);
       expect(match).not.toBeNull();
-      const palette = fs.readFileSync(path.resolve(__dirname, '../src/theme/palettes.ts'), 'utf-8');
+      const palette = fs.readFileSync(path.resolve(__dirname, '../src/shared/theme/palettes.ts'), 'utf-8');
       expect(palette.includes("inputBg: '#161820'")).toBe(true);
     });
   });
@@ -65,7 +65,7 @@ describe('Agent 3: TextInput & Typing Responsiveness Test Suite', () => {
       const barFocused = code.match(/inputBarFocused:\s*\{[^}]*borderTopColor:\s*t\.focus/s);
       const fieldFocused = code.match(/inputFieldFocused:\s*\{[^}]*borderColor:\s*t\.focus/s);
       expect(barFocused || fieldFocused).toBeTruthy();
-      const palette = fs.readFileSync(path.resolve(__dirname, '../src/theme/palettes.ts'), 'utf-8');
+      const palette = fs.readFileSync(path.resolve(__dirname, '../src/shared/theme/palettes.ts'), 'utf-8');
       expect(palette.includes("focus: '#3b82f6'")).toBe(true);
     });
 
@@ -73,7 +73,7 @@ describe('Agent 3: TextInput & Typing Responsiveness Test Suite', () => {
       const promptFocused = code.match(/promptCharFocused:\s*\{[^}]*color:\s*t\.success/s);
       expect(promptFocused).not.toBeNull();
       expect(code.includes('focused && styles.promptCharFocused')).toBe(true);
-      const palette = fs.readFileSync(path.resolve(__dirname, '../src/theme/palettes.ts'), 'utf-8');
+      const palette = fs.readFileSync(path.resolve(__dirname, '../src/shared/theme/palettes.ts'), 'utf-8');
       expect(palette.includes("success: '#22c55e'")).toBe(true);
     });
   });
