@@ -63,16 +63,14 @@ function ThemedApp() {
         />
       )}
 
-      {bridge.confirmModal.visible && (
-        <ConfirmModal
-          state={bridge.confirmModal}
-          onCancel={() => bridge.setConfirmModal((p) => ({ ...p, visible: false }))}
-          onExecute={() => {
-            bridge.dispatchAction(bridge.confirmModal.action);
-            bridge.setConfirmModal((p) => ({ ...p, visible: false }));
-          }}
-        />
-      )}
+      <ConfirmModal
+        state={bridge.confirmModal}
+        onCancel={() => bridge.setConfirmModal((p) => ({ ...p, visible: false }))}
+        onExecute={() => {
+          bridge.dispatchAction(bridge.confirmModal.action);
+          bridge.setConfirmModal((p) => ({ ...p, visible: false }));
+        }}
+      />
     </SafeAreaView>
   );
 }
