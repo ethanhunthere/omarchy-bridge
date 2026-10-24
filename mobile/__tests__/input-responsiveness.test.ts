@@ -133,4 +133,34 @@ describe('Agent 3: TextInput & Typing Responsiveness Test Suite', () => {
       expect(block.includes('keyboardAppearance="dark"') || block.includes("keyboardAppearance='dark'")).toBe(true);
     });
   });
+
+  describe('Requirement 6: Input bar stays visible while the keyboard is up', () => {
+    test('KAV offset is the tab absolute top measured in window, not 0', () => {
+      expect(code.includes('measureInWindow')).toBe(true);
+      expect(code.includes('keyboardVerticalOffset={keyboardOffset}')).toBe(true);
+      expect(code.includes('keyboardVerticalOffset={0}')).toBe(false);
+    });
+
+    test('iOS pads, Android leaves resize to the window', () => {
+      expect(code.includes("behavior={Platform.OS === 'ios' ? 'padding' : undefined}")).toBe(true);
+    });
+
+    test('send keeps focus instead of blurring the keyboard', () => {
+      expect(code.includes('submitBehavior="submit"')).toBe(true);
+    });
+
+    test('terminal auto-scrolls after the keyboard settles', () => {
+      expect(code.includes("Keyboard.addListener('keyboardDidShow'")).toBe(true);
+      expect(code.includes('scrollToEnd')).toBe(true);
+    });
+
+    test('tap toggles the keyboard from real focus state', () => {
+      expect(code.includes('if (inputFocused)')).toBe(true);
+      expect(code.includes('Keyboard.dismiss()')).toBe(true);
+    });
+
+    test('settings dialog dismiss layer sits behind the card', () => {
+      expect(code.includes('modalDismissLayer')).toBe(true);
+    });
+  });
 });

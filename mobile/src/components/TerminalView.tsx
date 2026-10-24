@@ -1,5 +1,6 @@
 import React, { memo, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import {
+  Dimensions,
   Keyboard,
   KeyboardAvoidingView,
   Platform,
@@ -398,11 +399,46 @@ export default function TerminalView({ bridge }: { bridge: BridgeController }) {
 
   // Keyboard insets land after a layout pass; pin to the newest line then.
   useEffect(() => {
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
     const show = Keyboard.addListener('keyboardDidShow', () => {
-      if (autoScroll) scrollViewRef.current?.scrollToEnd({ animated: true });
+      if (!autoScroll) return;
+      scrollViewRef.current?.scrollToEnd({ animated: true });
+      // KAV applies its padding on the same frame; settle once more after.
+      settleTimer = setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 120);
     });
-    return () => show.remove();
+    return () => {
+      if (settleTimer) clearTimeout(settleTimer);
+      show.remove();
+    };
   }, [autoScroll, scrollViewRef]);
+
+  // KeyboardAvoidingView compares its own (parent-relative) frame against the
+  // keyboard's screenY, so it needs the tab's absolute top as the offset or
+  // the input bar stays buried under the keyboard by header + safe-area px.
+  const anchorRef = useRef<View>(null);
+  const anchorTopRef = useRef(0);
+  const [keyboardOffset, setKeyboardOffset] = useState(0);
+
+  const measureAnchorTop = useCallback(() => {
+    anchorRef.current?.measureInWindow?.((_x: number, y: number) => {
+      if (typeof y === 'number' && Math.abs(y - anchorTopRef.current) > 0.5) {
+        anchorTopRef.current = y;
+        setKeyboardOffset(y);
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    const timer = setTimeout(measureAnchorTop, 0);
+    const dims = Dimensions.addEventListener('change', measureAnchorTop);
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const show = Keyboard.addListener(showEvent, measureAnchorTop);
+    return () => {
+      clearTimeout(timer);
+      dims.remove();
+      show.remove();
+    };
+  }, [measureAnchorTop]);
 
   // Tap the output: open the keyboard, or close it if it is already up.
   const onTerminalPress = useCallback(() => {
@@ -430,39 +466,41 @@ export default function TerminalView({ bridge }: { bridge: BridgeController }) {
   }, []);
 
   return (
-    <KeyboardAvoidingView
-      style={styles.flexOne}
-      // Android uses softwareKeyboardLayoutMode="resize": the window already
-      // shrinks, so adding KAV height on top would double-compress the view.
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={0}
-    >
-      <View style={styles.flexOne}>
-        <TerminalBody
-          screenLines={screenLines}
-          terminalText={terminalText}
-          autoScroll={autoScroll}
-          onPress={onTerminalPress}
-          onContentSizeChange={onContentSizeChange}
-          scrollViewRef={scrollViewRef}
-        />
-        <KeycapRibbon
-          autoScroll={autoScroll}
-          onToggleAutoScroll={onToggleAutoScroll}
-          onSignal={sendSignal}
-          onHistory={onHistory}
-          onClear={clearScreen}
-          onPrefill={onPrefill}
-        />
-        <TerminalInput
-          ref={inputHandleRef}
-          status={status}
-          onSend={sendCommand}
-          onFocused={onInputFocused}
-          onBlurred={onInputBlurred}
-        />
-      </View>
-    </KeyboardAvoidingView>
+    <View ref={anchorRef} style={styles.flexOne} collapsable={false} onLayout={measureAnchorTop}>
+      <KeyboardAvoidingView
+        style={styles.flexOne}
+        // Android uses softwareKeyboardLayoutMode="resize": the window already
+        // shrinks, so adding KAV height on top would double-compress the view.
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={keyboardOffset}
+      >
+        <View style={styles.flexOne}>
+          <TerminalBody
+            screenLines={screenLines}
+            terminalText={terminalText}
+            autoScroll={autoScroll}
+            onPress={onTerminalPress}
+            onContentSizeChange={onContentSizeChange}
+            scrollViewRef={scrollViewRef}
+          />
+          <KeycapRibbon
+            autoScroll={autoScroll}
+            onToggleAutoScroll={onToggleAutoScroll}
+            onSignal={sendSignal}
+            onHistory={onHistory}
+            onClear={clearScreen}
+            onPrefill={onPrefill}
+          />
+          <TerminalInput
+            ref={inputHandleRef}
+            status={status}
+            onSend={sendCommand}
+            onFocused={onInputFocused}
+            onBlurred={onInputBlurred}
+          />
+        </View>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
