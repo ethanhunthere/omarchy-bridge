@@ -59,6 +59,15 @@ const secureStoreMock = {
 mock.module('expo-secure-store', () => secureStoreMock);
 mock.module(import.meta.resolve('expo-secure-store').replace('file://', ''), () => secureStoreMock);
 
+const safeAreaMock = {
+  SafeAreaProvider: ({ children }: any) => children,
+  SafeAreaView: (props: any) => React.createElement('SafeAreaView', props, props?.children),
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+  initialWindowMetrics: { insets: { top: 0, right: 0, bottom: 0, left: 0 }, frame: { x: 0, y: 0, width: 400, height: 800 } },
+};
+mock.module('react-native-safe-area-context', () => safeAreaMock);
+mock.module(import.meta.resolve('react-native-safe-area-context').replace('file://', ''), () => safeAreaMock);
+
 const mockComponent = (name: string) => {
   const comp = (props: any) => React.createElement(name, props, props?.children);
   comp.displayName = name;

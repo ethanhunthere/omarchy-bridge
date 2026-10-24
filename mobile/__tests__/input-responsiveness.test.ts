@@ -2,16 +2,34 @@ import { test, expect, describe } from 'bun:test';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// ==========================================
+// Shared source collector: App shell + all src files,
+// so structural assertions keep working after the split.
+// ==========================================
+function collectMobileSource(): string {
+  const root = path.resolve(__dirname, '..');
+  const files: string[] = [path.join(root, 'App.tsx')];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(p);
+      else if (/\.(ts|tsx)$/.test(entry.name)) files.push(p);
+    }
+  };
+  walk(path.join(root, 'src'));
+  return files.map((f) => fs.readFileSync(f, 'utf-8')).join('\n');
+}
+
 describe('Agent 3: TextInput & Typing Responsiveness Test Suite', () => {
   const appPath = path.resolve(__dirname, '../App.tsx');
-  const code = fs.readFileSync(appPath, 'utf-8');
+  const code = collectMobileSource();
 
-  test('App.tsx exists and is readable', () => {
+  test('App entry exists and source tree is readable', () => {
     expect(fs.existsSync(appPath)).toBe(true);
     expect(code.length).toBeGreaterThan(1000);
   });
 
-  describe('Requirement 1: High-contrast white text (#ffffff) with 14px Menlo monospace font on #161820', () => {
+  describe('Requirement 1: High-contrast text with 14px Menlo monospace font on raised input surface', () => {
     test('fontFamily includes Menlo on iOS and monospace on Android', () => {
       const match = code.match(/inputField:\s*\{[^}]*fontFamily:\s*Platform\.OS === 'ios' \? 'Menlo' : 'monospace'/s);
       expect(match).not.toBeNull();
@@ -22,33 +40,41 @@ describe('Agent 3: TextInput & Typing Responsiveness Test Suite', () => {
       expect(match).not.toBeNull();
     });
 
-    test('text color is high-contrast white (#ffffff)', () => {
-      const match = code.match(/inputField:\s*\{[^}]*color:\s*'#ffffff'/s);
+    test('text uses theme primary token backed by high-contrast white (#ffffff)', () => {
+      const match = code.match(/inputField:\s*\{[^}]*color:\s*t\.textPrimary/s);
       expect(match).not.toBeNull();
+      const palette = fs.readFileSync(path.resolve(__dirname, '../src/theme/palettes.ts'), 'utf-8');
+      expect(palette.includes("textPrimary: '#ffffff'")).toBe(true);
     });
 
-    test('background color is dark high-contrast (#161820)', () => {
-      const match = code.match(/inputField:\s*\{[^}]*backgroundColor:\s*'#161820'/s);
+    test('input background uses theme inputBg token backed by dark high-contrast surface (#161820)', () => {
+      const match = code.match(/inputField:\s*\{[^}]*backgroundColor:\s*t\.inputBg/s);
       expect(match).not.toBeNull();
+      const palette = fs.readFileSync(path.resolve(__dirname, '../src/theme/palettes.ts'), 'utf-8');
+      expect(palette.includes("inputBg: '#161820'")).toBe(true);
     });
   });
 
-  describe('Requirement 2: Focus state changes border highlight to #3b82f6 with prompt ❯ highlighting in emerald green #22c55e', () => {
+  describe('Requirement 2: Focus state changes border highlight to accent focus color with prompt ❯ highlighting in green', () => {
     test('onFocus and onBlur manage isInputFocused state', () => {
       expect(code.includes('setIsInputFocused(true)')).toBe(true);
       expect(code.includes('setIsInputFocused(false)')).toBe(true);
     });
 
-    test('border highlight transitions to #3b82f6 when focused', () => {
-      const barFocused = code.match(/inputBarFocused:\s*\{[^}]*borderTopColor:\s*'#3b82f6'/s);
-      const fieldFocused = code.match(/inputFieldFocused:\s*\{[^}]*borderColor:\s*'#3b82f6'/s);
+    test('border highlight transitions to focus token (#3b82f6) when focused', () => {
+      const barFocused = code.match(/inputBarFocused:\s*\{[^}]*borderTopColor:\s*t\.focus/s);
+      const fieldFocused = code.match(/inputFieldFocused:\s*\{[^}]*borderColor:\s*t\.focus/s);
       expect(barFocused || fieldFocused).toBeTruthy();
+      const palette = fs.readFileSync(path.resolve(__dirname, '../src/theme/palettes.ts'), 'utf-8');
+      expect(palette.includes("focus: '#3b82f6'")).toBe(true);
     });
 
-    test('prompt ❯ highlights in emerald green #22c55e when focused', () => {
-      const promptFocused = code.match(/promptCharFocused:\s*\{[^}]*color:\s*'#22c55e'/s);
+    test('prompt ❯ highlights in emerald green (#22c55e) when focused', () => {
+      const promptFocused = code.match(/promptCharFocused:\s*\{[^}]*color:\s*t\.success/s);
       expect(promptFocused).not.toBeNull();
       expect(code.includes('isInputFocused && styles.promptCharFocused')).toBe(true);
+      const palette = fs.readFileSync(path.resolve(__dirname, '../src/theme/palettes.ts'), 'utf-8');
+      expect(palette.includes("success: '#22c55e'")).toBe(true);
     });
   });
 

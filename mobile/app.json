@@ -21,7 +21,10 @@
       }
     },
     "android": {
-      "package": "com.omarchy.clibridge"
+      "package": "com.omarchy.clibridge",
+      "softwareKeyboardLayoutMode": "resize",
+      "predictiveBackGestureEnabled": false,
+      "allowBackup": true
     },
     "extra": {
       "eas": {
@@ -29,7 +32,15 @@
       }
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ]
     ]
   }
 }

@@ -2,11 +2,29 @@ import { test, expect, describe } from 'bun:test';
 import * as fs from 'fs';
 import * as path from 'path';
 
+// ==========================================
+// Shared source collector: App shell + all src files,
+// so structural assertions keep working after the split.
+// ==========================================
+function collectMobileSource(): string {
+  const root = path.resolve(__dirname, '..');
+  const files: string[] = [path.join(root, 'App.tsx')];
+  const walk = (dir: string) => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const p = path.join(dir, entry.name);
+      if (entry.isDirectory()) walk(p);
+      else if (/\.(ts|tsx)$/.test(entry.name)) files.push(p);
+    }
+  };
+  walk(path.join(root, 'src'));
+  return files.map((f) => fs.readFileSync(f, 'utf-8')).join('\n');
+}
+
 describe('Agent 20: Wake-on-LAN Sender Button & Dispatch Test Suite', () => {
   const appPath = path.resolve(__dirname, '../App.tsx');
-  const code = fs.readFileSync(appPath, 'utf-8');
+  const code = collectMobileSource();
 
-  test('App.tsx exists and is readable', () => {
+  test('App entry exists and source tree is readable', () => {
     expect(fs.existsSync(appPath)).toBe(true);
     expect(code.length).toBeGreaterThan(1000);
   });
