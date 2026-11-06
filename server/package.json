@@ -3,7 +3,12 @@
   "version": "1.0.0",
   "description": "High-performance WebSocket & PTY bridge for remote CLI execution from iOS",
   "main": "server.js",
+  "bin": {
+    "pair": "../bin/pair",
+    "omarchy-bridge": "../bin/pair"
+  },
   "scripts": {
+    "pair": "../bin/pair",
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node test-suite.js",

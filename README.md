@@ -79,21 +79,15 @@
 - **[cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/)** (primary remote access: `sudo pacman -S cloudflared`, then `TUNNEL_URL` or `TUNNEL_MODE=quick` in `server/.env`)
 - **Tailscale** (optional power-user transport, disabled by default in `server/server.js`)
 
-### 2. Install & Start Backend Daemon
+### 2. Install & Start Backend Daemon (1-Step Setup)
 
 ```bash
 # Clone the repository
 git clone https://github.com/ethanhunthere/omarchy-bridge.git ~/Projects/omarchy-bridge
-cd ~/Projects/omarchy-bridge/server
+cd ~/Projects/omarchy-bridge
 
-# Install backend dependencies
-npm install
-
-# Configure passwordless polkit & sudoers rules for power controls
-sudo ../setup/install-permissions.sh
-
-# Install & enable the systemd user service
-systemctl --user enable --now omarchy-bridge
+# Run the 1-step installer (sets up dependencies, service, and 'pair' command)
+./install.sh
 ```
 
 ### 3. Pair Your Mobile Device
