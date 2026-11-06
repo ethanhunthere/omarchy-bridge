@@ -30,41 +30,38 @@ Fresh code: `pair --new`.
 
 ## 2. Put the app on your phone
 
-### Easiest: Expo Go
+Other people do not use Expo Go and do not need an Expo account.
 
-1. Install **Expo Go** from the App Store (iPhone) or Play Store (Android). The store build is SDK 58. This app matches that.
-2. On the PC:
+### Android: APK only
 
-```bash
-cd ~/Projects/omarchy-bridge/mobile
-npm install --legacy-peer-deps
-npx expo start
-```
+No Play Store. Google’s 12-tester rule does not apply.
 
-3. Phone and PC on the same Wi-Fi. Scan the QR code.
-   - iPhone: Camera, then Open in Expo Go.
-   - Android: scan inside Expo Go.
-
-### A real install (no Expo Go)
-
-Needs a free Expo account: `npx eas login` once.
-
-Android APK you can sideload:
+1. On the PC, once:
 
 ```bash
 cd ~/Projects/omarchy-bridge/mobile
 npx eas build -p android --profile preview
 ```
 
-Open the finished link on the phone and install the APK.
+2. Send people the APK link from that build.
+3. On the phone: download the APK, allow install from that browser, open it, pair.
 
-iPhone build needs an Apple Developer account and that phone registered with it:
+### iPhone: TestFlight
+
+Needs your Apple Developer account. Their phones do not.
+
+1. On the PC, once:
 
 ```bash
-npx eas build -p ios --profile preview
+cd ~/Projects/omarchy-bridge/mobile
+npx eas build -p ios --profile production
+npx eas submit -p ios --latest
 ```
 
-Open the link in Safari on that iPhone. There is no public App Store listing yet.
+2. In App Store Connect, turn on TestFlight and share the public link.
+3. On the iPhone: install TestFlight, open your link, install Omarchy Bridge, pair.
+
+Expo Go is only for you while developing. It always demands an Expo login. Do not send other people there.
 
 ## 3. Pair
 
