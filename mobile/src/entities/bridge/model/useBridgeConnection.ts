@@ -20,6 +20,7 @@ interface Options {
   patchTelemetry: (patch: Partial<Telemetry>) => void;
   resetOutput: () => void;
   persistRemote: (value: string) => void;
+  persistHost?: (value: string) => void;
   triggerHaptic: (type?: HapticKind) => void;
   loadHistory?: (commands: string[]) => void;
 }
@@ -36,6 +37,7 @@ export function useBridgeConnection(options: Options) {
     patchTelemetry,
     resetOutput,
     persistRemote,
+    persistHost,
     triggerHaptic,
     loadHistory,
   } = options;
@@ -103,6 +105,7 @@ export function useBridgeConnection(options: Options) {
             if (Array.isArray(msg.lines)) scheduleScreenLines(msg.lines);
             if (msg.history) setTerminalText(msg.history);
             if (Array.isArray(msg.commands) && loadHistory) loadHistory(msg.commands);
+            if (msg.lanIp && persistHost) persistHost(msg.lanIp);
             if (msg.telemetry) setTelemetry(msg.telemetry);
             if (msg.remote) {
               const remoteValue = normalizeBridgeValue(msg.remote.tunnelUrl || msg.remote.magicDns || msg.remote.ip || '');

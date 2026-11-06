@@ -1114,6 +1114,7 @@ wss.on('connection', (ws, req) => {
       lines: getCleanScreenLines(120),
       history: initialHistory,
       commands: commandHistory,
+      lanIp: getPrimaryLanIp(),
       telemetry: getLightTelemetry(),
       remote: {
         tunnelUrl: tunnelInfo.url,

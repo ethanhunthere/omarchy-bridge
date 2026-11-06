@@ -3,6 +3,7 @@ import { Keyboard } from 'react-native';
 import {
   DEFAULT_BRIDGE_HOST,
   clearDeviceToken,
+  persistBridgeHost,
   persistRemoteHost,
   readSavedBridgeHost,
   readSavedRemoteHost,
@@ -72,6 +73,14 @@ export function useBridge() {
     setSavedRemoteHost(value);
   }, []);
 
+  const persistHost = useCallback((ip: string) => {
+    if (!ip || ip === '127.0.0.1' || ip === 'localhost') return;
+    persistBridgeHost(ip);
+    savedHostRef.current = ip;
+    setSavedHost(ip);
+    setHostInput(ip);
+  }, []);
+
   const { record: recordHistory, loadHistory, nextHistoryValue } = useHistory(triggerHaptic);
 
   const {
@@ -94,6 +103,7 @@ export function useBridge() {
     patchTelemetry,
     resetOutput,
     persistRemote,
+    persistHost,
     triggerHaptic,
     loadHistory,
   });

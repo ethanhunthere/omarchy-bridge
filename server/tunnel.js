@@ -18,6 +18,7 @@ const path = require('path');
 
 let managedChild = null;
 let quickUrl = null;
+let rotationTimer = null;
 
 function which(cmd) {
   try {
@@ -77,6 +78,18 @@ function startQuickTunnel(port) {
       setTimeout(() => startQuickTunnel(port), 5000);
     }
   });
+
+  // Rotate quick tunnel URL every 24 hours for security & anti-tracking
+  if (!rotationTimer) {
+    rotationTimer = setInterval(() => {
+      if (managedChild && process.env.TUNNEL_MODE === 'quick') {
+        console.log('[TUNNEL] 24-hour expiration reached. Rotating to a new random Cloudflare Tunnel URL...');
+        try {
+          managedChild.kill();
+        } catch (e) {}
+      }
+    }, 24 * 60 * 60 * 1000);
+  }
 }
 
 function startTunnel(port) {
@@ -84,6 +97,10 @@ function startTunnel(port) {
 }
 
 function stopTunnel() {
+  if (rotationTimer) {
+    clearInterval(rotationTimer);
+    rotationTimer = null;
+  }
   if (managedChild) {
     try {
       managedChild.kill();
