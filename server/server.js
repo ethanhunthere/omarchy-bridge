@@ -855,6 +855,36 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // Local-only pairing info CLI endpoint: restricted strictly to loopback (127.0.0.1 / ::1)
+  if (reqUrl.pathname === '/api/pair-info' && req.method === 'GET') {
+    const isLoopback =
+      clientIp === '127.0.0.1' ||
+      clientIp === '::1' ||
+      clientIp === '::ffff:127.0.0.1' ||
+      clientIp === 'localhost';
+    if (!isLoopback) {
+      res.writeHead(403, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Forbidden: local-only CLI endpoint' }));
+      return;
+    }
+    const wantsNew = reqUrl.searchParams.get('new') === 'true' || reqUrl.searchParams.get('new') === '1';
+    const code = wantsNew ? auth.newPairingCode() : (auth.activePairingCode() || auth.newPairingCode());
+    const lanIp = getPrimaryLanIp();
+    const tunnel = getTunnelInfo();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(
+      JSON.stringify({
+        code,
+        lanIp,
+        port: PORT,
+        tunnelUrl: tunnel.available ? tunnel.url : null,
+        tunnelMode: tunnel.available ? tunnel.mode : null,
+        pairedDevices: auth.deviceCount(),
+      })
+    );
+    return;
+  }
+
   // Pairing endpoint: unauthenticated by design, guarded by one-time code + rate limit.
   if (reqUrl.pathname === '/api/pair' && req.method === 'POST') {
     let body = '';

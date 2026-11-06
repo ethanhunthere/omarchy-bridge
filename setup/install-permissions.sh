@@ -78,6 +78,13 @@ if [ -n "$TARGET_HOME" ] && [ -d "$TARGET_HOME" ]; then
     chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.config/systemd/user/omarchy-bridge.service" 2>/dev/null || true
     su - "$TARGET_USER" -c "systemctl --user daemon-reload" 2>/dev/null || true
     echo "[+] You can now run: systemctl --user enable --now omarchy-bridge"
+
+    # 7. Install 'pair' CLI shortcut into ~/.local/bin
+    mkdir -p "$TARGET_HOME/.local/bin"
+    ln -sf "$SCRIPT_DIR/../bin/pair" "$TARGET_HOME/.local/bin/pair"
+    ln -sf "$SCRIPT_DIR/../bin/pair" "$TARGET_HOME/.local/bin/omarchy-pair"
+    chown -h "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.local/bin/pair" "$TARGET_HOME/.local/bin/omarchy-pair" 2>/dev/null || true
+    echo "[+] Installed 'pair' CLI shortcut into $TARGET_HOME/.local/bin/pair"
 fi
 
 echo "=== Permissions & System Services Configured Successfully ==="

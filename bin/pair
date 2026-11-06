@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Omarchy Bridge — Instant Device Pairing CLI Helper
+# Usage: pair [--new] [--qr] [--json]
+# ==============================================================================
+
+set -eo pipefail
+
+PORT=19001
+API_URL="http://127.0.0.1:${PORT}/api/pair-info"
+
+WANTS_NEW=0
+WANTS_QR=0
+WANTS_JSON=0
+
+for arg in "$@"; do
+    case "$arg" in
+        --new|-n)
+            WANTS_NEW=1
+            ;;
+        --qr|-q)
+            WANTS_QR=1
+            ;;
+        --json|-j)
+            WANTS_JSON=1
+            ;;
+        --help|-h)
+            echo "Usage: pair [OPTIONS]"
+            echo ""
+            echo "Displays your Omarchy Bridge pairing code, exact IP, and connection endpoints."
+            echo ""
+            echo "Options:"
+            echo "  --new, -n   Generate a fresh 6-digit pairing code immediately"
+            echo "  --qr,  -q   Display terminal QR code for 1-tap mobile pairing"
+            echo "  --json, -j  Output raw JSON for scripts and integrations"
+            echo "  --help, -h  Show this help message"
+            exit 0
+            ;;
+    esac
+done
+
+# Ensure daemon is running
+if ! systemctl --user is-active --quiet omarchy-bridge 2>/dev/null; then
+    echo -e "\033[1;33m[!] omarchy-bridge service is not active. Starting daemon...\033[0m" >&2
+    systemctl --user start omarchy-bridge 2>/dev/null || true
+    sleep 1.5
+fi
+
+# Query local API
+ENDPOINT="$API_URL"
+if [ "$WANTS_NEW" -eq 1 ]; then
+    ENDPOINT="${API_URL}?new=true"
+fi
+
+RESPONSE=$(curl -s --connect-timeout 2 "$ENDPOINT" 2>/dev/null || true)
+
+if [ -z "$RESPONSE" ] || ! echo "$RESPONSE" | grep -q '"code"'; then
+    echo -e "\033[1;31m[✖] Error: Could not reach Omarchy Bridge daemon on port ${PORT}.\033[0m" >&2
+    echo "Check daemon status: systemctl --user status omarchy-bridge" >&2
+    exit 1
+fi
+
+if [ "$WANTS_JSON" -eq 1 ]; then
+    echo "$RESPONSE"
+    exit 0
+fi
+
+# Parse fields
+CODE=$(echo "$RESPONSE" | jq -r '.code // "000000"')
+LAN_IP=$(echo "$RESPONSE" | jq -r '.lanIp // "127.0.0.1"')
+PORT=$(echo "$RESPONSE" | jq -r '.port // "19001"')
+TUNNEL=$(echo "$RESPONSE" | jq -r '.tunnelUrl // "not configured"')
+PAIRED=$(echo "$RESPONSE" | jq -r '.pairedDevices // 0')
+
+TAILSCALE_IP=""
+if command -v tailscale >/dev/null 2>&1; then
+    TAILSCALE_IP=$(tailscale ip -4 2>/dev/null || true)
+fi
+
+# Colors
+C_CYAN="\033[1;36m"
+C_GREEN="\033[1;32m"
+C_YELLOW="\033[1;33m"
+C_MAGENTA="\033[1;35m"
+C_BOLD="\033[1m"
+C_DIM="\033[2m"
+C_RESET="\033[0m"
+
+echo ""
+echo -e "${C_CYAN}  ╭────────────────────────────────────────────────────────────╮${C_RESET}"
+echo -e "${C_CYAN}  │${C_RESET}               ${C_BOLD}🌌 OMARCHY BRIDGE PAIRING CARD${C_RESET}               ${C_CYAN}│${C_RESET}"
+echo -e "${C_CYAN}  ├────────────────────────────────────────────────────────────┤${C_RESET}"
+echo -e "${C_CYAN}  │${C_RESET}                                                            ${C_CYAN}│${C_RESET}"
+echo -e "${C_CYAN}  │${C_RESET}   ${C_BOLD}PAIRING CODE:${C_RESET}   ${C_GREEN}${C_BOLD}[ ${CODE} ]${C_RESET}  ${C_DIM}(valid 10 mins)${C_RESET}            ${C_CYAN}│${C_RESET}"
+echo -e "${C_CYAN}  │${C_RESET}                                                            ${C_CYAN}│${C_RESET}"
+echo -e "${C_CYAN}  │${C_RESET}   ${C_BOLD}Wi-Fi LAN IP:${C_RESET}   ${C_YELLOW}${LAN_IP}${C_RESET}                                ${C_CYAN}│${C_RESET}"
+echo -e "${C_CYAN}  │${C_RESET}   ${C_BOLD}Bridge Port:${C_RESET}    ${PORT}                                    ${C_CYAN}│${C_RESET}"
+
+if [ -n "$TUNNEL" ] && [ "$TUNNEL" != "null" ] && [ "$TUNNEL" != "not configured" ]; then
+    echo -e "${C_CYAN}  │${C_RESET}   ${C_BOLD}Cloudflare:${C_RESET}     ${C_MAGENTA}${TUNNEL}${C_RESET} ${C_CYAN}│${C_RESET}"
+fi
+
+if [ -n "$TAILSCALE_IP" ]; then
+    echo -e "${C_CYAN}  │${C_RESET}   ${C_BOLD}Tailscale IP:${C_RESET}   ${TAILSCALE_IP}                                 ${C_CYAN}│${C_RESET}"
+fi
+
+echo -e "${C_CYAN}  │${C_RESET}   ${C_BOLD}Paired Nodes:${C_RESET}   ${PAIRED} registered device(s)                   ${C_CYAN}│${C_RESET}"
+echo -e "${C_CYAN}  │${C_RESET}                                                            ${C_CYAN}│${C_RESET}"
+echo -e "${C_CYAN}  ├────────────────────────────────────────────────────────────┤${C_RESET}"
+echo -e "${C_CYAN}  │${C_RESET}   ${C_BOLD}On Your Phone:${C_RESET}                                           ${C_CYAN}│${C_RESET}"
+echo -e "${C_CYAN}  │${C_RESET}   1. Tap the ${C_BOLD}PAIR${C_RESET} badge in top right                         ${C_CYAN}│${C_RESET}"
+echo -e "${C_CYAN}  │${C_RESET}   2. Set Bridge host:   ${C_YELLOW}${LAN_IP}${C_RESET}                         ${C_CYAN}│${C_RESET}"
+echo -e "${C_CYAN}  │${C_RESET}   3. Set Pairing code:  ${C_GREEN}${CODE}${C_RESET}                                  ${C_CYAN}│${C_RESET}"
+echo -e "${C_CYAN}  ╰────────────────────────────────────────────────────────────╯${C_RESET}"
+echo ""
+
+if [ "$WANTS_QR" -eq 1 ]; then
+    PAIR_URI="omarchy-bridge://pair?host=${LAN_IP}&port=${PORT}&code=${CODE}"
+    if command -v qr >/dev/null 2>&1; then
+        echo -e "${C_DIM}Scan QR code from phone camera:${C_RESET}"
+        echo "$PAIR_URI" | qr
+        echo ""
+    fi
+fi

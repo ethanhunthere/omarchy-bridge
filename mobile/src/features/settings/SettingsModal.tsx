@@ -155,9 +155,9 @@ export default memo(function SettingsModal(props: SettingsModalProps) {
               ) : (
                 <View>
                   <Text style={styles.dialogTitle}>Pair This Device</Text>
-                  <Text style={styles.dialogMessage}>Get the newest code from the PC terminal:</Text>
+                  <Text style={styles.dialogMessage}>Run on your Omarchy laptop to view code & IP:</Text>
                   <Text style={styles.commandBlock} selectable allowFontScaling={false}>
-                    journalctl --user -u omarchy-bridge | grep PAIRING
+                    pair
                   </Text>
                   <Text style={styles.fieldLabel}>Pairing code</Text>
                   <TextInput

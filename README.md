@@ -96,14 +96,23 @@ sudo ../setup/install-permissions.sh
 systemctl --user enable --now omarchy-bridge
 ```
 
-Verify the daemon is active:
-```bash
-systemctl --user status omarchy-bridge
-# or test the public health endpoint:
-curl http://localhost:19001/health
-```
+### 3. Pair Your Mobile Device
 
-### 3. Launch Mobile App (Expo)
+Run the pairing assistant anytime from your laptop terminal:
+```bash
+pair
+```
+This prints an instant terminal card showing:
+- Active **6-digit pairing code**
+- Exact **Wi-Fi LAN IP** and **Bridge Port** (19001)
+- Remote **Cloudflare Tunnel URL**
+- Tailscale IP (if active)
+
+Options:
+- `pair --new` / `pair -n`: Generate a fresh pairing code on demand.
+- `pair --qr` / `pair -q`: Display a terminal ASCII QR code for 1-tap mobile pairing.
+
+### 4. Launch Mobile App (Expo)
 
 ```bash
 cd ~/Projects/omarchy-bridge/mobile
