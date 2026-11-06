@@ -11,13 +11,13 @@
     "pair": "../bin/pair",
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "test": "node test-suite.js",
-    "test:command": "node test-command-submission.js",
-    "test:wol": "node test-wol.js",
-    "test:dpms": "node test-dpms-toggle.js",
-    "test:clear": "node test-clear-functionality.js",
-    "test:stealth": "node test-stealth-mode.js",
-    "test:stress": "node stress-test.js"
+    "test": "node qa/test-suite.js",
+    "test:command": "node qa/test-command-submission.js",
+    "test:wol": "node qa/test-wol.js",
+    "test:dpms": "node qa/test-dpms-toggle.js",
+    "test:clear": "node qa/test-clear-functionality.js",
+    "test:stealth": "node qa/test-stealth-mode.js",
+    "test:stress": "node qa/stress-test.js"
   },
   "dependencies": {
     "@xterm/addon-serialize": "^0.14.0",

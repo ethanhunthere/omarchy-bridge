@@ -1,5 +1,5 @@
 import React, { memo } from 'react';
-import { Platform, Text, TouchableOpacity, View } from 'react-native';
+import { Platform, Text, TouchableOpacity, useWindowDimensions, View } from 'react-native';
 import { useTheme, useThemedStyles } from '../../shared/theme';
 import { ThemeTokens } from '../../shared/theme';
 import { ConnectionStatus } from '../../entities/bridge';
@@ -32,6 +32,7 @@ const ConnectionPill = memo(function ConnectionPill({
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
+      hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
       style={[
         styles.latencyPill,
         !paired && styles.latencyPillIdle,
@@ -75,12 +76,15 @@ export default memo(function HeaderBar({
 }) {
   const styles = useThemedStyles(makeStyles);
   const { theme } = useTheme();
+  const { width } = useWindowDimensions();
+  const compact = width < 360;
 
   const renderSegment = (tab: 'terminal' | 'power', label: string) => {
     const active = activeTab === tab;
     return (
       <TouchableOpacity
-        style={[styles.segmentBtn, active && styles.segmentBtnActive]}
+        hitSlop={{ top: 6, bottom: 6, left: 4, right: 4 }}
+        style={[styles.segmentBtn, compact && styles.segmentBtnCompact, active && styles.segmentBtnActive]}
         onPress={() => onSelectTab(tab)}
         accessibilityRole="tab"
         accessibilityState={{ selected: active }}
@@ -95,11 +99,14 @@ export default memo(function HeaderBar({
 
   return (
     <View style={styles.header}>
-      <View style={[styles.segmentedControl, { backgroundColor: theme.chipBg }]}>
+      <View style={styles.headerSide} />
+      <View style={[styles.segmentedControl, compact && styles.segmentedControlCompact, { backgroundColor: theme.chipBg }]}>
         {renderSegment('terminal', 'TERMINAL')}
         {renderSegment('power', 'SYSTEM')}
       </View>
-      <ConnectionPill latency={latency} status={status} paired={paired} onPress={onPressPill} />
+      <View style={styles.headerSide}>
+        <ConnectionPill latency={latency} status={status} paired={paired} onPress={onPressPill} />
+      </View>
     </View>
   );
 });
@@ -108,18 +115,20 @@ const makeStyles = (t: ThemeTokens) =>
   ({
     header: {
       flexDirection: 'row',
-      justifyContent: 'center',
       alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
       backgroundColor: t.bg,
       borderBottomWidth: 1,
       borderBottomColor: t.border,
-      position: 'relative',
+      gap: 8,
+    },
+    headerSide: {
+      flex: 1,
+      alignItems: 'flex-end',
+      justifyContent: 'center',
     },
     latencyPill: {
-      position: 'absolute',
-      right: 14,
       maxWidth: 96,
       backgroundColor: 'rgba(255, 255, 255, 0.04)',
       borderWidth: 1,
@@ -166,10 +175,16 @@ const makeStyles = (t: ThemeTokens) =>
     segmentBtn: {
       paddingHorizontal: 18,
       paddingVertical: 7,
-      minHeight: 34,
+      minHeight: 44,
       borderRadius: 16,
       alignItems: 'center',
       justifyContent: 'center',
+    },
+    segmentBtnCompact: {
+      paddingHorizontal: 10,
+    },
+    segmentedControlCompact: {
+      flexShrink: 1,
     },
     segmentBtnActive: {
       backgroundColor: t.chipActiveBg,

@@ -69,7 +69,7 @@ async function runProfiler() {
 
   // 1. Launch server with --expose-gc on dedicated port
   console.log('[1/6] Launching server with --expose-gc on port ' + PORT + '...');
-  const serverProc = spawn('/usr/bin/node', ['--expose-gc', path.join(__dirname, 'server.js')], {
+  const serverProc = spawn('/usr/bin/node', ['--expose-gc', path.join(__dirname, '../server.js')], {
     env: {
       ...process.env,
       PORT: String(PORT),

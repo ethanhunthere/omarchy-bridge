@@ -42,6 +42,10 @@ const secureStoreMock = {
     delete secureStoreValues[key];
   },
 };
+const navigationBarMock = { NavigationBar: () => null };
+mock.module('expo-navigation-bar', () => navigationBarMock);
+mock.module(import.meta.resolve('expo-navigation-bar').replace('file://', ''), () => navigationBarMock);
+
 mock.module('expo-secure-store', () => secureStoreMock);
 mock.module(import.meta.resolve('expo-secure-store').replace('file://', ''), () => secureStoreMock);
 
@@ -89,6 +93,7 @@ const rnMock = {
     addEventListener: mock(() => ({ remove: mock(() => {}) })),
   },
   Modal: mockComponent('Modal'),
+  useWindowDimensions: () => ({ width: 390, height: 844, scale: 2, fontScale: 1 }),
   Dimensions: {
     get: mock(() => ({ width: 390, height: 844 })),
     addEventListener: mock(() => ({ remove: mock(() => {}) })),

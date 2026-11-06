@@ -17,6 +17,7 @@ server/.env
 
 # Temporary Test Reports
 server/*-report.json
+server/**/*-report.json
 server/viewport-resize-audit-report.json
 
 # System & Editor

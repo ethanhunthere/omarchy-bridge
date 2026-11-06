@@ -59,6 +59,10 @@ const secureStoreMock = {
 mock.module('expo-secure-store', () => secureStoreMock);
 mock.module(import.meta.resolve('expo-secure-store').replace('file://', ''), () => secureStoreMock);
 
+const navigationBarMock = { NavigationBar: () => null };
+mock.module('expo-navigation-bar', () => navigationBarMock);
+mock.module(import.meta.resolve('expo-navigation-bar').replace('file://', ''), () => navigationBarMock);
+
 const safeAreaMock = {
   SafeAreaProvider: ({ children }: any) => children,
   SafeAreaView: (props: any) => React.createElement('SafeAreaView', props, props?.children),
@@ -118,6 +122,7 @@ const rnMock = {
     addEventListener: mock(() => ({ remove: mock(() => {}) })),
   },
   Modal: mockComponent('Modal'),
+  useWindowDimensions: () => ({ width: 400, height: 800, scale: 2, fontScale: 1 }),
   Dimensions: {
     get: mock(() => ({ width: 400, height: 800 })),
     addEventListener: mock((event: string, callback: Function) => {

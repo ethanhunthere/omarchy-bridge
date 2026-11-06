@@ -31,7 +31,7 @@ async function run() {
   console.log('======================================================\n');
 
   // 1. Audit App.tsx
-  const appTsx = fs.readFileSync(path.join(__dirname, '../mobile/App.tsx'), 'utf8');
+  const appTsx = fs.readFileSync(path.join(__dirname, '../../mobile/App.tsx'), 'utf8');
   assert(appTsx.includes("setInputCommand('agy')"), 'App.tsx must set inputCommand to "agy"');
   assert(appTsx.includes('styles.keycapTool'), 'App.tsx must use keycapTool styling');
   assert(appTsx.includes('styles.keycapToolText'), 'App.tsx must use keycapToolText styling');

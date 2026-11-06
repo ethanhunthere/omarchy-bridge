@@ -165,7 +165,7 @@ export const makeStyles = (t: ThemeTokens) =>
     hostEditBtn: {
       marginTop: 10,
       paddingVertical: 12,
-      minHeight: 44,
+      minHeight: 48,
       justifyContent: 'center',
       borderRadius: 4,
       borderWidth: 1,
@@ -191,7 +191,7 @@ export const makeStyles = (t: ThemeTokens) =>
       gap: 6,
       paddingHorizontal: 10,
       paddingVertical: 8,
-      minHeight: 40,
+      minHeight: 48,
       borderRadius: 6,
       borderWidth: 1,
       borderColor: t.border,

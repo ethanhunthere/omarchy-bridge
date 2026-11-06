@@ -50,8 +50,8 @@ function sleep(ms) {
 function runStaticCodeAudit() {
   logInfo('--- Suite 1: Static Code Audit (App.tsx & server.js) ---');
 
-  const appPath = path.resolve(__dirname, '../mobile/App.tsx');
-  const serverPath = path.resolve(__dirname, 'server.js');
+  const appPath = path.resolve(__dirname, '../../mobile/App.tsx');
+  const serverPath = path.resolve(__dirname, '../server.js');
 
   // Check 1: mobile/App.tsx existence
   if (!fs.existsSync(appPath)) {
@@ -134,7 +134,7 @@ async function runLiveE2ETests() {
   const TEST_PORT = 19099;
   const TEST_SESSION = 'omarchy-test-ctrl-d-' + Date.now();
   const TEST_TOKEN = 'test-ctrl-d-token-2026';
-  const serverPath = path.resolve(__dirname, 'server.js');
+  const serverPath = path.resolve(__dirname, '../server.js');
 
   // Clean up any stale tmux session
   try {

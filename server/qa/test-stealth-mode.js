@@ -42,7 +42,7 @@ function logInfo(msg) {
 async function testMobileComponentContract() {
   logInfo('--- Suite 1: Mobile UI Component Contract Audit (mobile/App.tsx) ---');
 
-  const appPath = path.resolve(__dirname, '../mobile/App.tsx');
+  const appPath = path.resolve(__dirname, '../../mobile/App.tsx');
   if (!fs.existsSync(appPath)) {
     logFail('MobileUI', 'App.tsx existence', `File not found at ${appPath}`);
     return;

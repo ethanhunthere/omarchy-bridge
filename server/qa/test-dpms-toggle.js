@@ -51,7 +51,7 @@ function logInfo(msg) {
 function runMobileAppAudit() {
   logInfo('--- Suite 1: Mobile Codebase Audit (mobile/App.tsx) ---');
 
-  const appTsxPath = path.resolve(__dirname, '../mobile/App.tsx');
+  const appTsxPath = path.resolve(__dirname, '../../mobile/App.tsx');
   if (!fs.existsSync(appTsxPath)) {
     logFail('MobileAudit', 'App.tsx exists', `File not found at ${appTsxPath}`);
     return;
@@ -108,7 +108,7 @@ function runMobileAppAudit() {
 function runServerCodeAudit() {
   logInfo('--- Suite 2: Server Codebase Audit (server/server.js) ---');
 
-  const serverJsPath = path.resolve(__dirname, 'server.js');
+  const serverJsPath = path.resolve(__dirname, '../server.js');
   if (!fs.existsSync(serverJsPath)) {
     logFail('ServerAudit', 'server.js exists', `File not found at ${serverJsPath}`);
     return;

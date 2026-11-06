@@ -3,9 +3,9 @@ import { AppState, Dimensions } from 'react-native';
 import {
   BRIDGE_PORT,
   DEFAULT_BRIDGE_HOST,
-  normalizeBridgeValue,
   resolveCandidateTargets,
 } from '../lib/bridge';
+import { handleBridgeSocketMessage } from './bridgeMessageHandler';
 import type { ConnectionStatus, Telemetry } from './types';
 import type { HapticKind } from './useHaptics';
 
@@ -97,45 +97,20 @@ export function useBridgeConnection(options: Options) {
 
       ws.onmessage = (event) => {
         if (!isMountedRef.current) return;
-        try {
-          const msg = JSON.parse(event.data);
-          if (msg.type === 'screen' && Array.isArray(msg.lines)) {
-            scheduleScreenLines(msg.lines);
-          } else if (msg.type === 'init') {
-            if (Array.isArray(msg.lines)) scheduleScreenLines(msg.lines);
-            if (msg.history) setTerminalText(msg.history);
-            if (Array.isArray(msg.commands) && loadHistory) loadHistory(msg.commands);
-            if (msg.lanIp && persistHost) persistHost(msg.lanIp);
-            if (msg.telemetry) setTelemetry(msg.telemetry);
-            if (msg.remote) {
-              const remoteValue = normalizeBridgeValue(msg.remote.tunnelUrl || msg.remote.magicDns || msg.remote.ip || '');
-              if (remoteValue && remoteValue !== savedRemoteHostRef.current) {
-                persistRemote(remoteValue);
-              }
-            }
-          } else if (msg.type === 'command_history' && Array.isArray(msg.commands)) {
-            if (loadHistory) loadHistory(msg.commands);
-          } else if (msg.type === 'output') {
-            appendOutputChunk(msg.data);
-          } else if (msg.type === 'telemetry') {
-            setTelemetry(msg.data);
-          } else if (msg.type === 'action_result') {
-            if (msg.result && typeof msg.result.dpmsOn === 'boolean') {
-              patchTelemetry({ dpmsOn: msg.result.dpmsOn });
-            }
-            if (msg.result && typeof msg.result.stealthMode === 'boolean') {
-              patchTelemetry({ stealthMode: msg.result.stealthMode });
-            }
-          } else if (msg.type === 'status' && msg.message) {
-            appendOutputChunk(msg.message);
-          } else if (msg.type === 'pong' && msg.clientTime) {
-            setLatency(Date.now() - msg.clientTime);
-          } else if (msg.type === 'cleared') {
-            resetOutput();
-          }
-        } catch (e) {
-          appendOutputChunk(event.data);
-        }
+        const raw = typeof event.data === 'string' ? event.data : String(event.data);
+        handleBridgeSocketMessage(raw, {
+          scheduleScreenLines,
+          appendOutputChunk,
+          setTerminalText,
+          setTelemetry,
+          patchTelemetry,
+          resetOutput,
+          persistRemote,
+          persistHost,
+          loadHistory,
+          setLatency,
+          savedRemoteHost: savedRemoteHostRef.current,
+        });
       };
 
       ws.onerror = () => {

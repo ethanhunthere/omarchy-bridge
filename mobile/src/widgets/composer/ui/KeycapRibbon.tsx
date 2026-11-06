@@ -76,7 +76,7 @@ const makeStyles = (t: ThemeTokens) =>
       backgroundColor: t.surfaceElevated,
       paddingHorizontal: 10,
       paddingVertical: 10,
-      minHeight: 44,
+      minHeight: 48,
       borderRadius: 4,
       borderWidth: 1,
       borderColor: t.borderStrong,

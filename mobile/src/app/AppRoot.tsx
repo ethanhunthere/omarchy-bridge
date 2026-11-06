@@ -1,5 +1,6 @@
 import React from 'react';
 import { StatusBar, View } from 'react-native';
+import { NavigationBar } from 'expo-navigation-bar';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { ErrorBoundary } from '../shared/ui';
 import { HeaderBar } from '../widgets/header';
@@ -18,7 +19,8 @@ function ThemedApp() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <StatusBar barStyle="light-content" backgroundColor={theme.bg} />
+      <StatusBar barStyle="light-content" backgroundColor={theme.bg} translucent={false} />
+      <NavigationBar style="dark" />
 
       <HeaderBar
         activeTab={bridge.activeTab}

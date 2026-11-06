@@ -17,10 +17,10 @@ const { execSync } = require('child_process');
 const WebSocket = require('ws');
 const http = require('http');
 
-const APP_PATH = path.resolve(__dirname, 'App.tsx');
-const SERVER_PATH = path.resolve(__dirname, '../server/server.js');
-const POLKIT_PATH = path.resolve(__dirname, '../setup/50-omarchy-bridge.rules');
-const SUDOERS_PATH = path.resolve(__dirname, '../setup/omarchy-bridge.sudoers');
+const APP_PATH = path.resolve(__dirname, '../App.tsx');
+const SERVER_PATH = path.resolve(__dirname, '../../server/server.js');
+const POLKIT_PATH = path.resolve(__dirname, '../../setup/50-omarchy-bridge.rules');
+const SUDOERS_PATH = path.resolve(__dirname, '../../setup/omarchy-bridge.sudoers');
 
 const results = [];
 let passCount = 0;

@@ -44,7 +44,7 @@ async function runAudit() {
   // 1. SOURCE CODE AUDIT: mobile/App.tsx
   // =========================================================================
   console.log('--- 1. Static Audit of mobile/App.tsx ---');
-  const appPath = path.resolve(__dirname, '../mobile/App.tsx');
+  const appPath = path.resolve(__dirname, '../../mobile/App.tsx');
   assert(fs.existsSync(appPath), 'App.tsx exists', appPath);
 
   const appSource = fs.readFileSync(appPath, 'utf8');
@@ -207,7 +207,7 @@ async function runAudit() {
   // 3. SERVER-SIDE COMMAND HANDLER VERIFICATION
   // =========================================================================
   console.log('\n--- 3. Server-Side Action Handler Verification ---');
-  const serverPath = path.resolve(__dirname, 'server.js');
+  const serverPath = path.resolve(__dirname, '../server.js');
   assert(fs.existsSync(serverPath), 'server.js exists', serverPath);
 
   const serverSource = fs.readFileSync(serverPath, 'utf8');

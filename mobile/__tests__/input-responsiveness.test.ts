@@ -174,7 +174,7 @@ describe('Agent 3: TextInput & Typing Responsiveness Test Suite', () => {
     });
 
     test('Bridge connection passes msg.commands to loadHistory on init', () => {
-      expect(code.includes('if (Array.isArray(msg.commands) && loadHistory) loadHistory(msg.commands);')).toBe(true);
+      expect(code.includes('if (Array.isArray(msg.commands) && handlers.loadHistory) handlers.loadHistory(msg.commands);')).toBe(true);
     });
 
     test('Arrow up and down navigation preserves draft and cycles in recency order', () => {

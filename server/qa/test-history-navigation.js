@@ -43,7 +43,7 @@ console.log('\n============================================================');
 console.log(' SECTION 1: Static Code Audit of mobile/App.tsx');
 console.log('============================================================\n');
 
-const appTsxPath = path.resolve(__dirname, '../mobile/App.tsx');
+const appTsxPath = path.resolve(__dirname, '../../mobile/App.tsx');
 assert(fs.existsSync(appTsxPath), 'Verify 1.0: mobile/App.tsx file exists on disk', appTsxPath);
 
 const appSource = fs.readFileSync(appTsxPath, 'utf8');

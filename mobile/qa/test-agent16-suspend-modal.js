@@ -15,9 +15,9 @@ const path = require('path');
 const { execSync } = require('child_process');
 const { performance } = require('perf_hooks');
 
-const APP_PATH = path.resolve(__dirname, 'App.tsx');
-const SERVER_PATH = path.resolve(__dirname, '../server/server.js');
-const POLKIT_PATH = path.resolve(__dirname, '../setup/50-omarchy-bridge.rules');
+const APP_PATH = path.resolve(__dirname, '../App.tsx');
+const SERVER_PATH = path.resolve(__dirname, '../../server/server.js');
+const POLKIT_PATH = path.resolve(__dirname, '../../setup/50-omarchy-bridge.rules');
 
 const results = [];
 

@@ -10,7 +10,7 @@ let token = process.env.AUTH_TOKEN || '';
 
 if (!token) {
   try {
-    const envPath = path.join(__dirname, '.env');
+    const envPath = path.join(__dirname, '../.env');
     const env = fs.readFileSync(envPath, 'utf8');
     const match = env.match(/^AUTH_TOKEN=(.+)$/m);
     if (match) token = match[1].trim();

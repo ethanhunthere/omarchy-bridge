@@ -14,7 +14,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const APP_PATH = path.resolve(__dirname, 'App.tsx');
+const APP_PATH = path.resolve(__dirname, '../App.tsx');
 const results = [];
 let passCount = 0;
 let failCount = 0;

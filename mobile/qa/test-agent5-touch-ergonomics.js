@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const appPath = path.join(__dirname, 'App.tsx');
+const appPath = path.join(__dirname, '../App.tsx');
 const content = fs.readFileSync(appPath, 'utf8');
 
 console.log('====================================================');

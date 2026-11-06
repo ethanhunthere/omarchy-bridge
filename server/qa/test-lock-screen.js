@@ -20,8 +20,8 @@ const PORT = 19001;
 const TOKEN = require('./test-token');
 const WS_URL = `ws://127.0.0.1:${PORT}?token=${TOKEN}`;
 
-const APP_PATH = path.resolve(__dirname, '../mobile/App.tsx');
-const SERVER_PATH = path.resolve(__dirname, 'server.js');
+const APP_PATH = path.resolve(__dirname, '../../mobile/App.tsx');
+const SERVER_PATH = path.resolve(__dirname, '../server.js');
 const SYSTEM_LOCK_SCRIPT = '/home/f0id/.local/bin/omarchy-system-lock';
 
 const results = [];

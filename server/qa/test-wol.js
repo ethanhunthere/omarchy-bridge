@@ -42,7 +42,7 @@ function header(title) {
 // -------------------------------------------------------------
 async function runMobileAudit() {
   header('Suite 1: Mobile UI Audit (mobile/App.tsx)');
-  const appPath = path.resolve(__dirname, '../mobile/App.tsx');
+  const appPath = path.resolve(__dirname, '../../mobile/App.tsx');
 
   try {
     if (!fs.existsSync(appPath)) {

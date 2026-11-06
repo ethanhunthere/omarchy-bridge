@@ -15,7 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const { performance } = require('perf_hooks');
 
-const APP_PATH = path.resolve(__dirname, 'App.tsx');
+const APP_PATH = path.resolve(__dirname, '../App.tsx');
 const results = [];
 
 function logPass(suite, name, details = '') {

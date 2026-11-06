@@ -6,6 +6,6 @@ export type {
   Telemetry,
 } from './model/useBridge';
 
-export * from './lib/bridge';
+export { DEFAULT_BRIDGE_HOST } from './lib/bridge';
 export { DEFAULT_TERMINAL_COLOR, parseAnsi } from './lib/ansi';
 export type { StyledSegment } from './lib/ansi';
