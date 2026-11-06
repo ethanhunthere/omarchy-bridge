@@ -110,7 +110,7 @@ export function readSavedBridgeHost(): string {
 export function persistBridgeHost(host: string): void {
   try {
     const file = new File(Paths.document, BRIDGE_HOST_FILENAME);
-    file.write(host);
+    file.writeSync(host);
   } catch (e) {}
 }
 
@@ -127,7 +127,7 @@ export function readSavedRemoteHost(): string {
 export function persistRemoteHost(host: string): void {
   try {
     const file = new File(Paths.document, REMOTE_HOST_FILENAME);
-    file.write(host);
+    file.writeSync(host);
   } catch (e) {}
 }
 
@@ -147,7 +147,7 @@ export function readSavedCommandHistory(): string[] {
 export function persistCommandHistory(commands: string[]): void {
   try {
     const file = new File(Paths.document, COMMAND_HISTORY_FILENAME);
-    file.write(JSON.stringify(commands.slice(0, 100)));
+    file.writeSync(JSON.stringify(commands.slice(0, 100)));
   } catch (e) {}
 }
 

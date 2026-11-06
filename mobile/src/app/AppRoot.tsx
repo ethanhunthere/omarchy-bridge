@@ -19,7 +19,7 @@ function ThemedApp() {
 
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
-      <StatusBar barStyle="light-content" backgroundColor={theme.bg} translucent={false} />
+      <StatusBar barStyle="light-content" />
       <NavigationBar style="dark" />
 
       <HeaderBar

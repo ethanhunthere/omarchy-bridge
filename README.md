@@ -32,7 +32,7 @@ Fresh code: `pair --new`.
 
 ### Easiest: Expo Go
 
-1. Install **Expo Go** from the App Store (iPhone) or Play Store (Android).
+1. Install **Expo Go** from the App Store (iPhone) or Play Store (Android). The store build is SDK 58. This app matches that.
 2. On the PC:
 
 ```bash

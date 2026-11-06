@@ -1,7 +1,7 @@
 import React from 'react';
 import { Platform, StatusBar, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTheme, useThemedStyles } from '../theme';
+import { useThemedStyles } from '../theme';
 import { ThemeTokens } from '../theme';
 
 interface ErrorBoundaryState {
@@ -11,10 +11,9 @@ interface ErrorBoundaryState {
 
 function ErrorFallback({ message, onReload }: { message?: string; onReload: () => void }) {
   const styles = useThemedStyles(makeStyles);
-  const { theme } = useTheme();
   return (
     <SafeAreaView style={styles.errorContainer}>
-      <StatusBar barStyle="light-content" backgroundColor={theme.bg} />
+      <StatusBar barStyle="light-content" />
       <View style={styles.errorCard}>
         <Text style={styles.errorBadge}>CRASH INTERCEPTED</Text>
         <Text style={styles.errorTitle}>Session Recovered</Text>
