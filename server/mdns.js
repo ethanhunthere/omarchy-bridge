@@ -94,7 +94,10 @@ function startMdns(port) {
 
   currentIp = getLanIp();
   if (!currentIp) {
-    console.warn('[MDNS] No non-internal IPv4 interface found; skipping mDNS advertisement.');
+    console.warn('[MDNS] No non-internal IPv4 interface found; retrying in 5s...');
+    setTimeout(() => {
+      if (!instance) startMdns(port);
+    }, 5000);
     return;
   }
 

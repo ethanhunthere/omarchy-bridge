@@ -160,6 +160,7 @@ export function useBridge() {
         connect();
       } else {
         setStatus('disconnected');
+        setHostModalVisible(true);
       }
     })();
     return () => {

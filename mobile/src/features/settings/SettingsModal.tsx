@@ -120,7 +120,7 @@ export default memo(function SettingsModal(props: SettingsModalProps) {
             >
               <Text style={styles.dialogTitle}>Bridge Host</Text>
               <Text style={styles.dialogMessage}>
-                Auto-discovers the PC as "{DEFAULT_BRIDGE_HOST}". If your network blocks mDNS, enter the PC's LAN IP.
+                Auto-discovers as "{DEFAULT_BRIDGE_HOST}". For manual or remote access, enter your LAN IP, Tailscale IP, or Cloudflare Tunnel URL.
               </Text>
               <Text style={styles.fieldLabel}>Bridge host</Text>
               <TextInput
