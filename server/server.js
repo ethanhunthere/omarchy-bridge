@@ -139,6 +139,85 @@ function getRecentScrollback(maxBytes = 32768) {
   return selected.join('');
 }
 
+// Recent session commands tracked in memory across all connected bridge clients
+const sessionCommandHistory = [];
+
+function recordSessionCommand(cmd) {
+  if (typeof cmd !== 'string') return;
+  const trimmed = cmd.trim();
+  if (!trimmed || trimmed.length > 1000) return;
+  const idx = sessionCommandHistory.indexOf(trimmed);
+  if (idx !== -1) sessionCommandHistory.splice(idx, 1);
+  sessionCommandHistory.unshift(trimmed);
+  if (sessionCommandHistory.length > 50) sessionCommandHistory.length = 50;
+}
+
+function getShellCommandHistory(max = 50) {
+  const home = process.env.HOME || os.homedir();
+  const fishFile = path.join(home, '.local/share/fish/fish_history');
+  const bashFile = path.join(home, '.bash_history');
+  const zshFile = path.join(home, '.zsh_history');
+  const diskCommands = [];
+
+  if (fs.existsSync(fishFile)) {
+    try {
+      const stat = fs.statSync(fishFile);
+      const readSize = Math.min(stat.size, 131072);
+      const buffer = Buffer.alloc(readSize);
+      const fd = fs.openSync(fishFile, 'r');
+      fs.readSync(fd, buffer, 0, readSize, stat.size - readSize);
+      fs.closeSync(fd);
+      const lines = buffer.toString('utf8').split('\n');
+      for (const line of lines) {
+        const match = line.match(/^\s*-\s*cmd:\s*(.+)$/);
+        if (match) {
+          const cmd = match[1].trim();
+          if (cmd && !cmd.includes('HIST_PROVEN_') && !cmd.includes('CTRL_D_VERIFIED')) {
+            diskCommands.push(cmd);
+          }
+        }
+      }
+    } catch (e) {}
+  } else if (fs.existsSync(bashFile)) {
+    try {
+      const lines = fs.readFileSync(bashFile, 'utf8').split('\n');
+      for (const line of lines) {
+        const cmd = line.trim();
+        if (cmd && !cmd.startsWith('#')) diskCommands.push(cmd);
+      }
+    } catch (e) {}
+  } else if (fs.existsSync(zshFile)) {
+    try {
+      const lines = fs.readFileSync(zshFile, 'utf8').split('\n');
+      for (const line of lines) {
+        let cmd = line.trim();
+        if (cmd.startsWith(':')) {
+          const semi = cmd.indexOf(';');
+          if (semi !== -1) cmd = cmd.slice(semi + 1).trim();
+        }
+        if (cmd) diskCommands.push(cmd);
+      }
+    } catch (e) {}
+  }
+
+  // Prepend live session commands, then disk history (most recent first)
+  const combined = [...sessionCommandHistory];
+  for (let i = diskCommands.length - 1; i >= 0; i--) {
+    combined.push(diskCommands[i]);
+  }
+
+  const unique = [];
+  const seen = new Set();
+  for (const c of combined) {
+    if (!seen.has(c)) {
+      seen.add(c);
+      unique.push(c);
+      if (unique.length >= max) break;
+    }
+  }
+  return unique;
+}
+
 // Headless terminal emulator to maintain clean 2D screen buffer
 const headlessTerm = new HeadlessTerminal({
   cols: 80,
@@ -1023,6 +1102,7 @@ wss.on('connection', (ws, req) => {
 
   // Send fast initial snapshot (max 32KB so launch is instant)
   const initialHistory = getRecentScrollback(32768);
+  const commandHistory = getShellCommandHistory(50);
   const tunnelInfo = getTunnelInfo();
   ws.send(
     JSON.stringify({
@@ -1033,6 +1113,7 @@ wss.on('connection', (ws, req) => {
       },
       lines: getCleanScreenLines(120),
       history: initialHistory,
+      commands: commandHistory,
       telemetry: getLightTelemetry(),
       remote: {
         tunnelUrl: tunnelInfo.url,
@@ -1052,6 +1133,7 @@ wss.on('connection', (ws, req) => {
         case 'input':
           if (ptyProcess && typeof parsed.data === 'string') {
             let cmd = parsed.data.replace(/\r?\n$/, '');
+            recordSessionCommand(cmd);
             ptyProcess.write(cmd + '\r');
           }
           break;

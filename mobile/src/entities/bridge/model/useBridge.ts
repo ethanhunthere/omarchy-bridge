@@ -72,6 +72,8 @@ export function useBridge() {
     setSavedRemoteHost(value);
   }, []);
 
+  const { record: recordHistory, loadHistory, nextHistoryValue } = useHistory(triggerHaptic);
+
   const {
     status,
     latency,
@@ -93,9 +95,8 @@ export function useBridge() {
     resetOutput,
     persistRemote,
     triggerHaptic,
+    loadHistory,
   });
-
-  const { record: recordHistory, nextHistoryValue } = useHistory(triggerHaptic);
 
   const selectTab = useCallback(
     (tab: 'terminal' | 'power') => {

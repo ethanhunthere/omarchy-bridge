@@ -106,7 +106,8 @@ export default function TerminalView({ bridge }: { bridge: BridgeController }) {
   const onToggleAutoScroll = useCallback(() => setAutoScroll((p) => !p), [setAutoScroll]);
   const onHistory = useCallback(
     (direction: 'up' | 'down') => {
-      const next = nextHistoryValue(direction);
+      const currentVal = inputHandleRef.current?.getValue?.() || '';
+      const next = nextHistoryValue(direction, currentVal);
       if (next !== null) inputHandleRef.current?.setValue(next);
       inputHandleRef.current?.focus();
     },

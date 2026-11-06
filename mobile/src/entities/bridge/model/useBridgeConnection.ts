@@ -21,6 +21,7 @@ interface Options {
   resetOutput: () => void;
   persistRemote: (value: string) => void;
   triggerHaptic: (type?: HapticKind) => void;
+  loadHistory?: (commands: string[]) => void;
 }
 
 export function useBridgeConnection(options: Options) {
@@ -36,6 +37,7 @@ export function useBridgeConnection(options: Options) {
     resetOutput,
     persistRemote,
     triggerHaptic,
+    loadHistory,
   } = options;
 
   const [status, setStatus] = useState<ConnectionStatus>('connecting');
@@ -100,6 +102,7 @@ export function useBridgeConnection(options: Options) {
           } else if (msg.type === 'init') {
             if (Array.isArray(msg.lines)) scheduleScreenLines(msg.lines);
             if (msg.history) setTerminalText(msg.history);
+            if (Array.isArray(msg.commands) && loadHistory) loadHistory(msg.commands);
             if (msg.telemetry) setTelemetry(msg.telemetry);
             if (msg.remote) {
               const remoteValue = normalizeBridgeValue(msg.remote.tunnelUrl || msg.remote.magicDns || msg.remote.ip || '');
@@ -107,6 +110,8 @@ export function useBridgeConnection(options: Options) {
                 persistRemote(remoteValue);
               }
             }
+          } else if (msg.type === 'command_history' && Array.isArray(msg.commands)) {
+            if (loadHistory) loadHistory(msg.commands);
           } else if (msg.type === 'output') {
             appendOutputChunk(msg.data);
           } else if (msg.type === 'telemetry') {

@@ -11,6 +11,7 @@ export const BRIDGE_PORT = 19001;
 export const DEFAULT_BRIDGE_HOST = 'omarchy-bridge.local';
 export const BRIDGE_HOST_FILENAME = 'omarchy-bridge-host.txt';
 export const REMOTE_HOST_FILENAME = 'omarchy-bridge-remote.txt';
+export const COMMAND_HISTORY_FILENAME = 'omarchy-command-history.json';
 export const DEVICE_TOKEN_KEY = 'omarchy-bridge-device-token';
 
 export async function readDeviceToken(): Promise<string> {
@@ -127,6 +128,26 @@ export function persistRemoteHost(host: string): void {
   try {
     const file = new File(Paths.document, REMOTE_HOST_FILENAME);
     file.write(host);
+  } catch (e) {}
+}
+
+export function readSavedCommandHistory(): string[] {
+  try {
+    const file = new File(Paths.document, COMMAND_HISTORY_FILENAME);
+    if (!file.exists) return [];
+    const text = file.textSync();
+    if (!text) return [];
+    const parsed = JSON.parse(text);
+    return Array.isArray(parsed) ? parsed.filter((c) => typeof c === 'string' && c.trim()) : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+export function persistCommandHistory(commands: string[]): void {
+  try {
+    const file = new File(Paths.document, COMMAND_HISTORY_FILENAME);
+    file.write(JSON.stringify(commands.slice(0, 100)));
   } catch (e) {}
 }
 

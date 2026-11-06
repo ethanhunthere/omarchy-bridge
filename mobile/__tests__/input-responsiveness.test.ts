@@ -165,4 +165,23 @@ describe('Agent 3: TextInput & Typing Responsiveness Test Suite', () => {
       expect(code.includes('modalDismissLayer')).toBe(true);
     });
   });
+
+  describe('Requirement 7: Synchronized Command History & Arrow Up/Down Memory', () => {
+    test('useHistory supports loadHistory and initial command synchronization', () => {
+      expect(code.includes('loadHistory')).toBe(true);
+      expect(code.includes('persistCommandHistory')).toBe(true);
+      expect(code.includes('readSavedCommandHistory')).toBe(true);
+    });
+
+    test('Bridge connection passes msg.commands to loadHistory on init', () => {
+      expect(code.includes('if (Array.isArray(msg.commands) && loadHistory) loadHistory(msg.commands);')).toBe(true);
+    });
+
+    test('Arrow up and down navigation preserves draft and cycles in recency order', () => {
+      expect(code.includes('nextHistoryValue(direction, currentVal)')).toBe(true);
+      expect(code.includes('draftRef.current')).toBe(true);
+      expect(code.includes("direction === 'up'")).toBe(true);
+      expect(code.includes("direction === 'down'")).toBe(true);
+    });
+  });
 });

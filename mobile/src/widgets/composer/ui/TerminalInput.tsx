@@ -5,6 +5,7 @@ import { ConnectionStatus } from '../../../entities/bridge';
 
 export interface TerminalInputHandle {
   setValue: (value: string) => void;
+  getValue: () => string;
   focus: () => void;
 }
 
@@ -32,6 +33,7 @@ export const TerminalInput = React.forwardRef<
       setValue(next);
       setHasText(next.length > 0);
     },
+    getValue: () => value,
     focus: () => inputRef.current?.focus(),
   }));
 
