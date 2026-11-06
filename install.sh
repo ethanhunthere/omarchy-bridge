@@ -5,7 +5,23 @@
 
 set -e
 
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_URL="https://github.com/ethanhunthere/omarchy-bridge.git"
+DEST="${OMARCHY_BRIDGE_DIR:-$HOME/Projects/omarchy-bridge}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd || true)"
+
+# curl | bash has no checkout next to the script. Clone, then re-run the real installer.
+if [ ! -f "${SCRIPT_DIR}/server/package.json" ]; then
+  echo "=== Fetching Omarchy Bridge ==="
+  mkdir -p "$(dirname "$DEST")"
+  if [ -d "$DEST/.git" ]; then
+    git -C "$DEST" pull --ff-only
+  else
+    git clone "$REPO_URL" "$DEST"
+  fi
+  exec "$DEST/install.sh"
+fi
+
+REPO_DIR="$SCRIPT_DIR"
 
 echo "=== Installing Omarchy Bridge ==="
 

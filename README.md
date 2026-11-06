@@ -2,66 +2,50 @@
 
 Control your Omarchy PC from your phone. Live terminal, power buttons, and a one-time pairing code. The iPhone and Android apps are the same screens: same top bar, same bottom composer, same themes.
 
-## 1. Install on the PC
+Two different people. Do not make both do both jobs.
 
-You need Omarchy (or Arch with Hyprland), Node.js 20+, and `tmux`.
+| Who | What they do | What they never do |
+| :--- | :--- | :--- |
+| PC owner | One install command, then `pair` | Expo Go |
+| Phone | Install the app you sent, type the code | Git, Expo account, this repo |
+
+## 1. PC owner, once
+
+Need Omarchy, Node.js 20+, and `tmux`. Paste this. It clones and installs.
 
 ```bash
-git clone https://github.com/ethanhunthere/omarchy-bridge.git ~/Projects/omarchy-bridge
-cd ~/Projects/omarchy-bridge
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/ethanhunthere/omarchy-bridge/main/install.sh | bash
 ```
 
-That installs the server, permissions, and a background service, then prints a pairing card.
-
-Later, from any terminal:
+Then, any time someone needs in:
 
 ```bash
 pair
 ```
 
-The card shows:
+That card is the Wi-Fi IP and the 6-digit code. Send those two lines. Fresh code: `pair --new`.
 
-- a 6-digit code (about 10 minutes, then it rotates)
-- your Wi-Fi IP
-- a tunnel URL, if one is running
+## 2. Phone, no repo
 
-Fresh code: `pair --new`.
+You build the app once and send a link. They do not clone anything.
 
-## 2. Put the app on your phone
-
-Other people do not use Expo Go and do not need an Expo account.
-
-### Android: APK only
-
-No Play Store. Google’s 12-tester rule does not apply.
-
-1. On the PC, once:
+Android is an APK. No Play Store, so the 12-tester rule does not apply.
 
 ```bash
 cd ~/Projects/omarchy-bridge/mobile
 npx eas build -p android --profile preview
 ```
 
-2. Send people the APK link from that build.
-3. On the phone: download the APK, allow install from that browser, open it, pair.
-
-### iPhone: TestFlight
-
-Needs your Apple Developer account. Their phones do not.
-
-1. On the PC, once:
+iPhone is TestFlight. Uses your Apple Developer account. Their phones do not need Expo or Apple Developer.
 
 ```bash
-cd ~/Projects/omarchy-bridge/mobile
 npx eas build -p ios --profile production
 npx eas submit -p ios --latest
 ```
 
-2. In App Store Connect, turn on TestFlight and share the public link.
-3. On the iPhone: install TestFlight, open your link, install Omarchy Bridge, pair.
+Send the APK link or the TestFlight link. Their steps: install, open, tap **PAIR**, type the IP and the code from `pair`.
 
-Expo Go is only for you while developing. It always demands an Expo login. Do not send other people there.
+Expo Go is only for you while coding. It always wants an Expo login. Do not send other people there.
 
 ## 3. Pair
 
