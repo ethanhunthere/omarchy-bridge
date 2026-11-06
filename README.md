@@ -25,27 +25,23 @@ pair
 
 That card is the Wi-Fi IP and the 6-digit code. Send those two lines. Fresh code: `pair --new`.
 
-## 2. Phone, no repo
+## 2. Phone
 
-You build the app once and send a link. They do not clone anything.
+The app is not on the App Store or Play Store. Same screens on iPhone and Android.
 
-Android is an APK. No Play Store, so the 12-tester rule does not apply.
+Until a download link is posted, run it from the checkout you just installed:
 
 ```bash
 cd ~/Projects/omarchy-bridge/mobile
-npx eas build -p android --profile preview
+npm install --legacy-peer-deps
+npx expo start
 ```
 
-iPhone is TestFlight. Uses your Apple Developer account. Their phones do not need Expo or Apple Developer.
+Install **Expo Go** (SDK 58) on the phone. Sign in with your own Expo account. The PC must be logged into that same account (`npx expo login`). Enter the URL Expo prints. Do not use the iPhone Camera app on the QR code.
 
-```bash
-npx eas build -p ios --profile production
-npx eas submit -p ios --latest
-```
+Then tap **PAIR**. Host is the IP from `pair`. Code is the 6 digits from `pair`.
 
-Send the APK link or the TestFlight link. Their steps: install, open, tap **PAIR**, type the IP and the code from `pair`.
-
-Expo Go is only for you while coding. It always wants an Expo login. Do not send other people there.
+Do not post the pairing card, `server/.env`, or your LAN IP in the thread. The code expires in about 10 minutes. `pair --new` prints another.
 
 ## 3. Pair
 

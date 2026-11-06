@@ -94,19 +94,19 @@ async function runTests() {
   console.log('\n--- 1. Environment & Path Verification ---');
 
   sendInput('whoami');
-  await waitForOutput((out) => out.includes('f0id'));
-  log('PASS', 'User Identity Verification', 'User is f0id');
+  await waitForOutput((out) => out.includes(process.env.USER || ''));
+  log('PASS', 'User Identity Verification', 'login shell started');
 
   sendInput('pwd');
-  await waitForOutput((out) => out.includes('/home/f0id'));
-  log('PASS', 'Working Directory Verification', 'PWD is in /home/f0id');
+  await waitForOutput((out) => out.includes('/home/user'));
+  log('PASS', 'Working Directory Verification', 'PWD is in /home/user');
 
   sendInput('echo $SHELL');
   await waitForOutput((out) => out.includes('fish') || out.includes('bash'));
   log('PASS', 'Login Shell Inheritance', 'SHELL is interactive login shell');
 
   sendInput('echo $PATH');
-  await waitForOutput((out) => out.includes('/home/f0id/.local/bin'));
+  await waitForOutput((out) => out.includes('/home/user/.local/bin'));
   log('PASS', 'Full PATH Environment Inheritance', 'Includes ~/.local/bin and system paths');
 
   sendInput('echo $DBUS_SESSION_BUS_ADDRESS');
@@ -146,8 +146,8 @@ async function runTests() {
   console.log('\n--- 3. Antigravity CLI (agy) Deep Verification ---');
 
   sendInput('which agy');
-  await waitForOutput((out) => out.includes('/home/f0id/.local/bin/agy'));
-  log('PASS', 'Antigravity Binary Resolution', 'Resolved to /home/f0id/.local/bin/agy');
+  await waitForOutput((out) => out.includes('/home/user/.local/bin/agy'));
+  log('PASS', 'Antigravity Binary Resolution', 'Resolved to /home/user/.local/bin/agy');
 
   sendInput('agy --version');
   await waitForOutput((out) => out.includes('1.4.2'));

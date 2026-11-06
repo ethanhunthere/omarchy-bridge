@@ -149,7 +149,7 @@ async function runLiveE2ETests() {
       AUTH_TOKEN: TEST_TOKEN,
       TMUX_SESSION: TEST_SESSION,
       SHELL_CMD: '/usr/bin/fish',
-      WORK_DIR: '/home/f0id',
+      WORK_DIR: '/home/user',
     },
     stdio: 'pipe',
   });

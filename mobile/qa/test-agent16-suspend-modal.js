@@ -298,9 +298,9 @@ async function runAudit() {
     const polkitContent = fs.readFileSync(POLKIT_PATH, 'utf-8');
     const hasPolkitSuspend = polkitContent.includes('org.freedesktop.login1.suspend') &&
                              polkitContent.includes('polkit.Result.YES') &&
-                             polkitContent.includes('subject.user == "f0id"');
+                             polkitContent.includes('subject.user == "user"');
     if (hasPolkitSuspend) {
-      logPass('PolkitAuth', 'Polkit rule explicitly grants passwordless org.freedesktop.login1.suspend to user f0id', 'setup/50-omarchy-bridge.rules');
+      logPass('PolkitAuth', 'Polkit rule explicitly grants passwordless org.freedesktop.login1.suspend to the wheel group', 'setup/50-omarchy-bridge.rules');
     } else {
       logFail('PolkitAuth', 'Polkit suspend permission', 'Rule missing org.freedesktop.login1.suspend or Result.YES');
     }

@@ -22,7 +22,7 @@ const WS_URL = `ws://127.0.0.1:${PORT}?token=${TOKEN}`;
 
 const APP_PATH = path.resolve(__dirname, '../../mobile/App.tsx');
 const SERVER_PATH = path.resolve(__dirname, '../server.js');
-const SYSTEM_LOCK_SCRIPT = '/home/f0id/.local/bin/omarchy-system-lock';
+const SYSTEM_LOCK_SCRIPT = '/home/user/.local/bin/omarchy-system-lock';
 
 const results = [];
 
@@ -124,9 +124,9 @@ async function auditServerCode() {
   }
 
   // Check 2.3: ENHANCED_PATH includes ~/.local/bin
-  const hasLocalBinInPath = serverCode.includes("'/home/f0id/.local/bin'");
+  const hasLocalBinInPath = serverCode.includes("'/home/user/.local/bin'");
   if (hasLocalBinInPath) {
-    logPass('ServerAudit', 'ENHANCED_PATH includes /home/f0id/.local/bin where omarchy-system-lock resides');
+    logPass('ServerAudit', 'ENHANCED_PATH includes /home/user/.local/bin where omarchy-system-lock resides');
   } else {
     logFail('ServerAudit', 'ENHANCED_PATH resolution', '~/.local/bin not present in ENHANCED_PATH');
   }
@@ -210,7 +210,7 @@ async function auditZeroPasswordPromptHangs() {
     const start = Date.now();
     // Run bash with empty/no stdin to ensure no prompt hangs
     const res = execSync(`bash -c 'type omarchy-system-lock'`, {
-      env: { ...process.env, PATH: '/home/f0id/.local/bin:' + process.env.PATH },
+      env: { ...process.env, PATH: '/home/user/.local/bin:' + process.env.PATH },
       timeout: 2000,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
