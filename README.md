@@ -6,8 +6,8 @@ Two different people. Do not make both do both jobs.
 
 | Who | What they do | What they never do |
 | :--- | :--- | :--- |
-| PC owner | One install command, then `pair` | Expo Go |
-| Phone | Install the app you sent, type the code | Git, Expo account, this repo |
+| PC | One install command, then `pair` | Posting the pairing card |
+| Phone | App from this same repo, then the code from `pair` | A separate download |
 
 ## 1. PC owner, once
 
@@ -25,23 +25,18 @@ pair
 
 That card is the Wi-Fi IP and the 6-digit code. Send those two lines. Fresh code: `pair --new`.
 
-## 2. Phone
-
-The app is not on the App Store or Play Store. Same screens on iPhone and Android.
-
-Until a download link is posted, run it from the checkout you just installed:
+## 2. Phone, from the same repo
 
 ```bash
 cd ~/Projects/omarchy-bridge/mobile
 npm install --legacy-peer-deps
+npx expo login
 npx expo start
 ```
 
-Install **Expo Go** (SDK 58) on the phone. Sign in with your own Expo account. The PC must be logged into that same account (`npx expo login`). Enter the URL Expo prints. Do not use the iPhone Camera app on the QR code.
+Open that project on the phone. Tap **PAIR**. Host is the IP from `pair`. Code is the 6 digits from `pair`.
 
-Then tap **PAIR**. Host is the IP from `pair`. Code is the 6 digits from `pair`.
-
-Do not post the pairing card, `server/.env`, or your LAN IP in the thread. The code expires in about 10 minutes. `pair --new` prints another.
+Do not post the pairing card, `server/.env`, or your LAN IP. The code expires in about 10 minutes. `pair --new` prints another.
 
 ## 3. Pair
 
