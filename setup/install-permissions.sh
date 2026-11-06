@@ -68,4 +68,16 @@ else
     echo "[+] cloudflared found. Set TUNNEL_URL or TUNNEL_MODE=quick in server/.env"
 fi
 
+# 6. User-level systemd service
+TARGET_USER="${SUDO_USER:-$USER}"
+TARGET_HOME=$(getent passwd "$TARGET_USER" | cut -d: -f6)
+if [ -n "$TARGET_HOME" ] && [ -d "$TARGET_HOME" ]; then
+    echo "[+] Installing systemd user service into $TARGET_HOME/.config/systemd/user/..."
+    mkdir -p "$TARGET_HOME/.config/systemd/user"
+    cp "$SCRIPT_DIR/omarchy-bridge.service" "$TARGET_HOME/.config/systemd/user/omarchy-bridge.service"
+    chown -R "$TARGET_USER:$TARGET_USER" "$TARGET_HOME/.config/systemd/user/omarchy-bridge.service" 2>/dev/null || true
+    su - "$TARGET_USER" -c "systemctl --user daemon-reload" 2>/dev/null || true
+    echo "[+] You can now run: systemctl --user enable --now omarchy-bridge"
+fi
+
 echo "=== Permissions & System Services Configured Successfully ==="

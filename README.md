@@ -121,16 +121,18 @@ Notes:
 - **iOS and Android:** both fully supported. Android builds enable cleartext LAN traffic (`ws://`/`http://` to `192.168.x.x` and `.local` names) via `expo-build-properties`; iOS does the same through an ATS exception. A native rebuild (`eas build`) is required after config or dependency changes — Expo Go cannot load these native modules.
 - **mDNS (`omarchy-bridge.local`):** reliable on iOS; on Android it depends on the OEM resolver (Android 12+ usually works). The app always tries the stored LAN IP and the Cloudflare tunnel URL as fallbacks, so discovery failure is never fatal.
 
-### Mobile app structure
+### Mobile app structure (Feature-Sliced Design)
 
 ```
 mobile/
-  App.tsx                  entry shim (re-exports src/AppRoot)
-  src/AppRoot.tsx          providers + screen composition
-  src/hooks/useBridge.ts   connection, pairing, terminal + hardware state
-  src/components/*         HeaderBar, TerminalView, PowerView, modals, ErrorBoundary
-  src/lib/*                bridge targets/discovery, ANSI parser
-  src/theme/*              palette tokens (palettes.ts) + ThemeProvider
+  App.tsx                  entry shim (re-exports src/app)
+  src/
+    app/                   AppRoot & providers
+    views/                 TerminalView & PowerView screens
+    widgets/               HeaderBar & Terminal Keycap Ribbon
+    features/              SettingsModal & ConfirmModal
+    entities/bridge/       Controller hooks, pairing, targets, ANSI parser
+    shared/                ThemeProvider, tokens, ErrorBoundary
 ```
 
 **Themes:** six selectable palettes ship in `src/theme/palettes.ts` — Industrial (default), Gruvbox, Nord, Tokyo Night, Catppuccin, and Kanagawa. Switch in the settings sheet (connection pill → Appearance); the choice is stored on-device. Themes only swap color tokens — layout never changes.

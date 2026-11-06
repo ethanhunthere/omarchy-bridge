@@ -1,0 +1,24 @@
+[Unit]
+Description=Omarchy Remote CLI Bridge (Persistent tmux & node-pty WebSocket Server)
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/Projects/omarchy-bridge/server
+ExecStart=/usr/bin/node %h/Projects/omarchy-bridge/server/server.js
+Restart=always
+RestartSec=3
+
+# Full environment for interactive CLI tools (agy, git, python, etc.)
+Environment="NODE_ENV=production"
+Environment="TERM=xterm-256color"
+Environment="COLORTERM=truecolor"
+PassEnvironment=PATH HOME USER LOGNAME SHELL DBUS_SESSION_BUS_ADDRESS XDG_RUNTIME_DIR XDG_CONFIG_HOME WAYLAND_DISPLAY HYPRLAND_INSTANCE_SIGNATURE
+
+# Headless background execution - journal logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=omarchy-bridge
+
+[Install]
+WantedBy=default.target

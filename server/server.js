@@ -4,6 +4,7 @@
  */
 
 const http = require('http');
+const path = require('path');
 const os = require('os');
 const fs = require('fs');
 const crypto = require('crypto');
@@ -27,17 +28,19 @@ const PORT = parseInt(process.env.PORT || '19001', 10);
 const HOST = process.env.HOST || '0.0.0.0';
 const TMUX_SESSION = process.env.TMUX_SESSION || 'omarchy-remote';
 const USER_SHELL = process.env.SHELL_CMD || process.env.SHELL || '/usr/bin/fish';
-const WORK_DIR = process.env.WORK_DIR || process.env.HOME || process.cwd();
+const USER_HOME = process.env.HOME || os.homedir();
+const USER_NAME = process.env.USER || process.env.LOGNAME || (typeof os.userInfo === 'function' ? os.userInfo()?.username : null) || path.basename(USER_HOME);
+const USER_UID = typeof process.getuid === 'function' ? process.getuid() : 1000;
+const WORK_DIR = process.env.WORK_DIR || USER_HOME || process.cwd();
 const PRIMARY_MAC = process.env.PRIMARY_MAC || '14:13:33:a8:af:df';
 
 const ENHANCED_PATH = [
-  '/home/f0id/.gemini/antigravity-cli/bin',
-  '/home/f0id/.local/bin',
-  '/home/f0id/.opencode/bin',
-  '/home/f0id/.adal/bin',
-  '/home/f0id/.local/share/mise/installs/node/26.2.0/bin',
-  '/home/f0id/.local/share/mise/shims',
-  '/home/f0id/.local/share/omarchy/bin',
+  path.join(USER_HOME, '.gemini/antigravity-cli/bin'),
+  path.join(USER_HOME, '.local/bin'),
+  path.join(USER_HOME, '.opencode/bin'),
+  path.join(USER_HOME, '.adal/bin'),
+  path.join(USER_HOME, '.local/share/mise/shims'),
+  path.join(USER_HOME, '.local/share/omarchy/bin'),
   '/usr/local/sbin',
   '/usr/local/bin',
   '/usr/bin',
@@ -48,12 +51,12 @@ const ENHANCED_PATH = [
   .join(':');
 
 process.env.PATH = ENHANCED_PATH;
-process.env.HOME = process.env.HOME || '/home/f0id';
-process.env.USER = process.env.USER || 'f0id';
-process.env.LOGNAME = process.env.LOGNAME || 'f0id';
-process.env.DBUS_SESSION_BUS_ADDRESS = process.env.DBUS_SESSION_BUS_ADDRESS || 'unix:path=/run/user/1000/bus';
-process.env.XDG_RUNTIME_DIR = process.env.XDG_RUNTIME_DIR || '/run/user/1000';
-process.env.XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME || '/home/f0id/.config';
+process.env.HOME = USER_HOME;
+process.env.USER = USER_NAME;
+process.env.LOGNAME = USER_NAME;
+process.env.DBUS_SESSION_BUS_ADDRESS = process.env.DBUS_SESSION_BUS_ADDRESS || `unix:path=/run/user/${USER_UID}/bus`;
+process.env.XDG_RUNTIME_DIR = process.env.XDG_RUNTIME_DIR || `/run/user/${USER_UID}`;
+process.env.XDG_CONFIG_HOME = process.env.XDG_CONFIG_HOME || path.join(USER_HOME, '.config');
 process.env.TERM = 'xterm-256color';
 process.env.COLORTERM = 'truecolor';
 
